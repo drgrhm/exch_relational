@@ -1,9 +1,13 @@
 import numpy as np
 import tensorflow as tf
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from copy import deepcopy
 from data_util import DataLoader, Table
 from model import Model
+from layers import ExchangeableLayer, FeatureDropoutLayer
+
 
 ## Noise mask has 0's corresponding to values to be predicted
 def table_rmse_loss(values, values_rec, noise_mask):
@@ -11,25 +15,47 @@ def table_rmse_loss(values, values_rec, noise_mask):
     return tf.sqrt( tf.reduce_sum(((values - values_rec)**2)*non_noise) / (tf.reduce_sum(non_noise) + 1e-10) )
 
 
-def table_prediction_accuracy(indices, values, values_rec, shape, noise):
-    # print("HERE")
-    # print(np.squeeze(sparse_array_to_dense(indices, values, shape, 1)))
-
-
-    pred_d = np.sum( ((values < opts['draw_eps']) * (values_rec < opts['draw_eps']))[noise == 0] )
-    inds_wl = (noise == 0) * (values_rec >= opts['draw_eps'])
-    pred_wl = np.sum((values_rec*values)[inds_wl] > 0 )
+def table_prediction_accuracy(indices, values, values_rec, shape, split):
     
-    return (pred_d + pred_wl) / (2*np.sum(noise == 0))
+    in_t = sparse_transpose(indices, values, shape, split)
+    out_t = sparse_transpose(indices, values_rec, shape, split)
+    vals_in_t = in_t['values']
+    vals_out_t = out_t['values']
+    noise = 1 - in_t['split']            
+
+    preds_in = np.sign(np.reshape(vals_in_t[noise == 0], [-1,2])[:,0])
+    num_vals = preds_in.shape[0]
+
+    vals_out = np.reshape(vals_out_t[noise == 0], [-1,2])                    
+    preds_out = (np.abs(vals_out[:,0]) + np.abs(vals_out[:,1]) ) / 2
+    preds_out = np.sign(np.round(np.sign(vals_out[:,0]) * preds_out, decimals=1)) ## TODO better way 
 
 
-def make_noise_mask(noise_rate, num_vals):
+    # print('preds_in:  ', preds_in[0:20].astype(np.float32))
+    # print('preds_out: ', preds_out[0:20])
+
+
+    return np.sum(preds_in == preds_out) / num_vals
+
+
+
+def make_uniform_noise_mask(noise_rate, num_vals):
     """A 0/1 noise mask. 0's correspond to dropped out values."""
     n0 = int(noise_rate * num_vals)
     n1 = num_vals - n0
     noise_mask = np.concatenate((np.zeros(n0), np.ones(n1)))
     np.random.shuffle(noise_mask)
     return noise_mask
+
+def make_by_col_noise_mask(noise_rate, num_vals, shape, column_indices):
+    """A 0/1 noise mask. 0's correspond to dropped out values. Drop out columns."""
+    num_cols = shape[1]
+    n0 = int(noise_rate * num_cols)
+    n1 = num_cols - n0
+    column_mask = np.concatenate((np.zeros(n0), np.ones(n1)))
+    np.random.shuffle(column_mask)
+    noise_mask = np.take(column_mask, column_indices)
+    return noise_mask    
 
 # def make_noisy_values(values, noise_rate, noise_value):
 #     """replace noise_rate fraction of values with noise_value."""
@@ -115,7 +141,7 @@ def main(opts):
 
 
         team_player_out_tr, team_match_out_tr = model.get_output(team_player, team_match)
-        team_player_out_vl, team_match_out_vl = model.get_output(team_player, team_match, reuse=True)
+        team_player_out_vl, team_match_out_vl = model.get_output(team_player, team_match, reuse=True, is_training=False)
 
         rec_loss_tr = 0
         # rec_loss_tr += table_rmse_loss(team_player_values, team_player_out_tr['values'], team_player_noise_mask)
@@ -160,7 +186,8 @@ def main(opts):
             team_player_values_noisy = np.copy(data.team_player.values_tr)
 
 
-            team_match_noise = make_noise_mask(opts['noise_rate'], data.team_match.num_values_tr) 
+            # team_match_noise = make_uniform_noise_mask(opts['noise_rate'], data.team_match.num_values_tr) 
+            team_match_noise = make_by_col_noise_mask(opts['noise_rate'], data.team_match.num_values_tr, data.team_match.shape, data.team_match.indices_tr[:,1]) 
             team_match_values_noisy = np.copy(data.team_match.values_tr)
             team_match_values_noisy[team_match_noise == 0] = noise_value
 
@@ -178,8 +205,8 @@ def main(opts):
 
             _, loss_tr, team_match_vals_out_tr, = sess.run([train_step, total_loss_tr, team_match_out_tr['values']], feed_dict=tr_dict)
             losses_tr.append(loss_tr)
-
-                       
+              
+            pred_accuracy_tr = 0
             pred_accuracy_tr = table_prediction_accuracy(data.team_match.indices_tr, data.team_match.values_tr, team_match_vals_out_tr, data.team_match.shape, team_match_noise)
             accuracies_tr.append(pred_accuracy_tr)
 
@@ -217,30 +244,46 @@ def main(opts):
             loss_vl_mean = np.sqrt( np.sum(((data.team_match.values_tr_vl - mean_tr)**2)*non_noise) / np.sum(non_noise) )
             losses_vl_mean.append(loss_vl_mean)
 
-            split = data.team_match.split
-            in_t = sparse_transpose(data.team_match.indices_tr_vl, data.team_match.values_tr_vl, data.team_match.shape, split[split < 2])
-            out_t = sparse_transpose(data.team_match.indices_tr_vl, team_match_vals_out_vl, data.team_match.shape, split[split < 2])
-            vals_in_t = in_t['values']
-            vals_out_t = out_t['values']
+
+
+
+
+
+
+            # split = data.team_match.split
+
+
+            # in_t = sparse_transpose(data.team_match.indices_tr_vl, data.team_match.values_tr_vl, data.team_match.shape, split[split < 2])
+            # out_t = sparse_transpose(data.team_match.indices_tr_vl, team_match_vals_out_vl, data.team_match.shape, split[split < 2])
+            # vals_in_t = in_t['values']
+            # vals_out_t = out_t['values']
             
-            noise = 1 - in_t['split']
-            print(vals_in_t[noise == 0][0:20])
-            print(np.round(vals_out_t[noise == 0][0:20]).astype(np.int32))
-            print(vals_out_t[noise == 0][0:20])
+            # noise = 1 - in_t['split']            
+
+            # preds_in = np.sign(np.reshape(vals_in_t[noise == 0], [-1,2])[:,0])
+            # num_vals = preds_in.shape[0]
+
+            # vals_out = np.reshape(vals_out_t[noise == 0], [-1,2])                    
+            # preds_out = (np.abs(vals_out[:,0]) + np.abs(vals_out[:,1]) ) / 2
+            # preds_out = np.sign(np.round(np.sign(vals_out[:,0]) * preds_out, decimals=1))
+
+            # # print(vals_out[0:20,:])
+            # print('preds_in:  ', preds_in[0:20].astype(np.float32))
+            # print('preds_out: ', preds_out[0:20])
 
 
-            # print(np.round(vals_out_t[split == 0][0:20]).astype(np.int32))
-            # print(vals_out_t[split == 0][0:20])
+            # pred_accuracy_vl = np.sum(preds_in == preds_out) / num_vals
 
 
-            # print(vals_in[team_match_noise == 1][0:20])
-            # print(np.round(vals_out[team_match_noise == 1][0:20]).astype(np.int32))
-            # print('')
-            # print(vals_in[team_match_noise == 0][0:20])
-            # print(np.round(vals_out[team_match_noise == 0][0:20]).astype(np.int32))
 
 
-            pred_accuracy_vl = table_prediction_accuracy(data.team_match.indices_tr_vl, data.team_match.values_tr_vl, team_match_vals_out_vl, data.team_match.shape, team_match_noise)
+            split = data.team_match.split
+            pred_accuracy_vl = table_prediction_accuracy(data.team_match.indices_tr_vl, data.team_match.values_tr_vl, team_match_vals_out_vl, data.team_match.shape, split[split < 2])
+
+
+
+
+
             accuracies_vl.append(pred_accuracy_vl)
 
 
@@ -271,8 +314,8 @@ def main(opts):
         plt.title('Prediction Accuracy')
         plt.plot(range(opts['epochs'])[-show_last:], accuracies_tr[-show_last:], '.-', color='blue')
         plt.plot(range(opts['epochs'])[-show_last:], accuracies_vl[-show_last:], '.-', color='green')
-        plt.plot(range(opts['epochs'])[-show_last:], [.46 for _ in range(opts['epochs'])], '.-', color='red')
-        plt.plot(range(opts['epochs'])[-show_last:], [.53 for _ in range(opts['epochs'])], '.-', color='yellow')
+        plt.plot(range(opts['epochs'])[-show_last:], [.46 for _ in range(opts['epochs'])[-show_last:]], '.-', color='red')
+        plt.plot(range(opts['epochs'])[-show_last:], [.53 for _ in range(opts['epochs'])[-show_last:]], '.-', color='yellow')
         plt.xlabel('epoch')
         plt.ylabel('Accuracy')
         plt.legend(('training prediction', 'validation prediction', 'baseline', 'experts'))        
@@ -284,14 +327,27 @@ def main(opts):
 if __name__ == "__main__":
     np.set_printoptions(suppress=True,linewidth=np.nan,threshold=np.nan)
 
-    opts = {'epochs':300,
+
+    units = 128
+    activation = tf.nn.relu
+    dropout_rate = 0.2    
+
+
+    opts = {'epochs':2000,
             'data_split':[.8, .2, .0], # train, validation, test split
-            'noise_rate':.2, # match vl/tr or ts/(tr+vl) 
+            'noise_rate':dropout_rate, # match vl/tr or ts/(tr+vl) ?
             'regularization_rate':.00001,
-            'learning_rate':.001,
-            'draw_eps':1e-2, # how close to be considered a draw
+            'learning_rate':.0001,
             'layer_opts':{'pool_mode':'mean',
-                          'activation':tf.nn.relu,
+                          'dropout_rate':dropout_rate,
+                          'layers':[{'type':ExchangeableLayer, 'units':units, 'activation':activation},
+                                    {'type':FeatureDropoutLayer, 'units':units},
+                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation},                                    
+                                    # {'type':ExchangeableLayer, 'units':units, 'activation':activation},
+                                    # {'type':ExchangeableLayer, 'units':units, 'activation':activation},
+                                    # {'type':ExchangeableLayer, 'units':units, 'activation':activation},
+                                    {'type':ExchangeableLayer, 'units':1,  'activation':None},
+                                   ],
                          },
             'debug':True,
             'verbosity':2

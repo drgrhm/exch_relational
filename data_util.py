@@ -2,6 +2,7 @@ import numpy as np
 import sqlite3
 from itertools import groupby
 
+
 class DataLoader:
 
     def __init__(self, data_folder, tr, vl, ts):
@@ -129,17 +130,6 @@ class Table:
             n_vl = np.sum(split == 1)
             n_tr = n - n_ts - n_vl
 
-
-            # split = np.concatenate((np.zeros(n_tr, np.int32), np.ones(n_vl, np.int32), 2*np.ones(n_ts, np.int32)))
-            # np.random.shuffle(split)       
-
-            # print('split: ', np.sum(split))
-            # print('AA_split: ', np.sum(AA_split))
-
-
-
-        elif split_mode == 'by_row':
-            print("TODO: implement")
 
         self._set_data_splits(indices, values, split)
         self.shape = shape
