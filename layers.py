@@ -133,6 +133,7 @@ class ExchangeableLayer(Layer):
 
         self.pool_mode = kwargs['pool_mode']
         self.activation = kwargs['activation']
+        self.skip_connections = kwargs.get('skip_connections', False)
         self.scope = kwargs['scope']
         self.params = {}
 
@@ -191,6 +192,12 @@ class ExchangeableLayer(Layer):
             if self.activation is not None:
                 team_player_vals = self.activation(team_player_vals)
                 team_match_vals = self.activation(team_match_vals)
+
+
+            if self.skip_connections and units_in == units_out:
+                team_player_vals = team_player_vals + team_player['values'],
+                team_match_vals = team_match_vals + team_match['values'],
+
 
             team_player_out = {'indices':team_player['indices'], 'values':team_player_vals, 'shape':team_player['shape']}
             team_match_out = {'indices':team_match['indices'], 'values':team_match_vals, 'shape':team_match['shape']}

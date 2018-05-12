@@ -3,6 +3,8 @@ import tensorflow as tf
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import os
+import glob
 from copy import deepcopy
 from data_util import DataLoader, Table
 from model import Model
@@ -30,10 +32,8 @@ def table_prediction_accuracy(indices, values, values_rec, shape, split):
     preds_out = (np.abs(vals_out[:,0]) + np.abs(vals_out[:,1]) ) / 2
     preds_out = np.sign(np.round(np.sign(vals_out[:,0]) * preds_out, decimals=1)) ## TODO better way 
 
-
     # print('preds_in:  ', preds_in[0:20].astype(np.float32))
     # print('preds_out: ', preds_out[0:20])
-
 
     return np.sum(preds_in == preds_out) / num_vals
 
@@ -99,7 +99,7 @@ def sparse_transpose(indices, values, shape, split):
 
 
 
-def main(opts):
+def main(opts, restore_point=None):
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
 
     tr, vl, ts = opts['data_split']
@@ -158,6 +158,9 @@ def main(opts):
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
         sess.run(tf.global_variables_initializer())
 
+        saver = tf.train.Saver()
+        if restore_point is not None:
+            saver.restore(sess, restore_point)
 
         if opts['layer_opts']['pool_mode'] == 'mean':
             noise_value = 0
@@ -174,7 +177,7 @@ def main(opts):
         accuracy_vl_best_ep = 0
 
 
-        for ep in range(opts['epochs']):
+        for ep in range(opts['restore_point_epoch'] + 1, opts['restore_point_epoch'] + opts['epochs'] + 1):
             if opts['verbosity'] > 0:
                 print('------- epoch:', ep, '-------')
 
@@ -184,7 +187,6 @@ def main(opts):
 
             team_player_noise = np.ones_like(data.team_player.values_tr)
             team_player_values_noisy = np.copy(data.team_player.values_tr)
-
 
             # team_match_noise = make_uniform_noise_mask(opts['noise_rate'], data.team_match.num_values_tr) 
             team_match_noise = make_by_col_noise_mask(opts['noise_rate'], data.team_match.num_values_tr, data.team_match.shape, data.team_match.indices_tr[:,1]) 
@@ -206,10 +208,8 @@ def main(opts):
             _, loss_tr, team_match_vals_out_tr, = sess.run([train_step, total_loss_tr, team_match_out_tr['values']], feed_dict=tr_dict)
             losses_tr.append(loss_tr)
               
-            pred_accuracy_tr = 0
             pred_accuracy_tr = table_prediction_accuracy(data.team_match.indices_tr, data.team_match.values_tr, team_match_vals_out_tr, data.team_match.shape, team_match_noise)
             accuracies_tr.append(pred_accuracy_tr)
-
 
 
             # team_player_noise = 1 - data.team_player.split[data.team_player.split <= 1]
@@ -238,68 +238,33 @@ def main(opts):
             losses_vl.append(loss_vl)
 
 
-
             mean_tr = data.team_match.mean_tr
             non_noise = 1 - team_match_noise
             loss_vl_mean = np.sqrt( np.sum(((data.team_match.values_tr_vl - mean_tr)**2)*non_noise) / np.sum(non_noise) )
             losses_vl_mean.append(loss_vl_mean)
 
-
-
-
-
-
-
-            # split = data.team_match.split
-
-
-            # in_t = sparse_transpose(data.team_match.indices_tr_vl, data.team_match.values_tr_vl, data.team_match.shape, split[split < 2])
-            # out_t = sparse_transpose(data.team_match.indices_tr_vl, team_match_vals_out_vl, data.team_match.shape, split[split < 2])
-            # vals_in_t = in_t['values']
-            # vals_out_t = out_t['values']
-            
-            # noise = 1 - in_t['split']            
-
-            # preds_in = np.sign(np.reshape(vals_in_t[noise == 0], [-1,2])[:,0])
-            # num_vals = preds_in.shape[0]
-
-            # vals_out = np.reshape(vals_out_t[noise == 0], [-1,2])                    
-            # preds_out = (np.abs(vals_out[:,0]) + np.abs(vals_out[:,1]) ) / 2
-            # preds_out = np.sign(np.round(np.sign(vals_out[:,0]) * preds_out, decimals=1))
-
-            # # print(vals_out[0:20,:])
-            # print('preds_in:  ', preds_in[0:20].astype(np.float32))
-            # print('preds_out: ', preds_out[0:20])
-
-
-            # pred_accuracy_vl = np.sum(preds_in == preds_out) / num_vals
-
-
-
-
             split = data.team_match.split
             pred_accuracy_vl = table_prediction_accuracy(data.team_match.indices_tr_vl, data.team_match.values_tr_vl, team_match_vals_out_vl, data.team_match.shape, split[split < 2])
-
-
-
-
-
             accuracies_vl.append(pred_accuracy_vl)
 
 
             if pred_accuracy_vl > accuracy_vl_best:
                 accuracy_vl_best = pred_accuracy_vl
                 accuracy_vl_best_ep = ep
-                ## TODO save model
+
+                if opts['save_model']:
+                    path = os.path.join(opts['checkpoints_folder'], 'epoch_{:05d}'.format(ep) + '.ckpt')
+                    saver.save(sess, path)
 
             
             if opts['verbosity'] > 0:
                 # print("epoch {:5d}. training loss: {:5.15f} \t validation loss: {:5.5f} \t predicting mean: {:5.5f} \t train accuracy rate: {:5.5f} \t val accuracy rate: {:5.5f}".format(ep+1, loss_tr, loss_vl, loss_vl_mean, pred_accuracy_tr, pred_accuracy_vl))
-                print("epoch {:5d}. train accuracy rate: {:5.5f} \t val accuracy rate: {:5.5f} \t best val accuracy rate: {:5.5f} at epoch {:5d}".format(ep+1, pred_accuracy_tr, pred_accuracy_vl, accuracy_vl_best, accuracy_vl_best_ep+1))
+                print("epoch {:5d}. train accuracy rate: {:5.5f} \t val accuracy rate: {:5.5f} \t best val accuracy rate: {:5.5f} at epoch {:5d}".format(ep, pred_accuracy_tr, pred_accuracy_vl, accuracy_vl_best, accuracy_vl_best_ep))
 
         
 
-        show_last = 1000
+        show_last = opts['epochs']
+        # show_last = 2000
         plt.title('RMSE Loss')
         plt.plot(range(opts['epochs'])[-show_last:], losses_tr[-show_last:], '.-', color='blue')
         plt.plot(range(opts['epochs'])[-show_last:], losses_vl[-show_last:], '.-', color='green')
@@ -328,12 +293,15 @@ if __name__ == "__main__":
     np.set_printoptions(suppress=True,linewidth=np.nan,threshold=np.nan)
 
 
-    units = 128
+    units = 256
     activation = tf.nn.relu
-    dropout_rate = 0.2    
+    dropout_rate = 0.2
+    auto_restore = False
+    save_model = False
+    skip_connections = True
 
 
-    opts = {'epochs':2000,
+    opts = {'epochs':1500,
             'data_split':[.8, .2, .0], # train, validation, test split
             'noise_rate':dropout_rate, # match vl/tr or ts/(tr+vl) ?
             'regularization_rate':.00001,
@@ -342,17 +310,35 @@ if __name__ == "__main__":
                           'dropout_rate':dropout_rate,
                           'layers':[{'type':ExchangeableLayer, 'units':units, 'activation':activation},
                                     {'type':FeatureDropoutLayer, 'units':units},
-                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation},                                    
-                                    # {'type':ExchangeableLayer, 'units':units, 'activation':activation},
-                                    # {'type':ExchangeableLayer, 'units':units, 'activation':activation},
-                                    # {'type':ExchangeableLayer, 'units':units, 'activation':activation},
+                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units':units},             
+                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units':units},             
+                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units':units},             
+                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units':units},             
+                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units':units},             
+                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
                                     {'type':ExchangeableLayer, 'units':1,  'activation':None},
                                    ],
                          },
+            'verbosity':2,
+            'checkpoints_folder':'checkpoints',
+            'restore_point_epoch':-1,
+            'save_model':save_model,
             'debug':True,
-            'verbosity':2
             }
-    main(opts)
+
+    restore_point = None
+
+    if auto_restore:         
+        restore_point_epoch = sorted(glob.glob(opts['checkpoints_folder'] + "/epoch_*.ckpt*"))[-1].split(".")[0].split("_")[-1]
+        restore_point = opts['checkpoints_folder'] + "/epoch_" + restore_point_epoch + ".ckpt"
+        opts['restore_point_epoch'] = int(restore_point_epoch)
+
+    main(opts, restore_point)
 
 
 

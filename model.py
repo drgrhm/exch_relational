@@ -17,7 +17,8 @@ class Model:
             name = 'layer_' + str(l)
             units_out = layer['units']
             activation = layer.get('activation', None)
-            self.layers[name] = layer['type'](units=[units_in, units_out], pool_mode=pool_mode, dropout_rate=dropout_rate, activation=activation, scope=name)
+            skip_connections = layer.get('skip_connections', False)
+            self.layers[name] = layer['type'](units=[units_in, units_out], pool_mode=pool_mode, dropout_rate=dropout_rate, activation=activation, skip_connections=skip_connections, scope=name)
             units_in = units_out
 
 
