@@ -213,14 +213,9 @@ class FeatureDropoutLayer(Layer):
         Layer.__init__(self, units)
         self.dropout_rate = kwargs['dropout_rate']
         self.scope = kwargs['scope']
-        self.params = {}
 
 
     def get_output(self, team_player, team_match, reuse=None, is_training=True):
-
-        
-        # team_player_vals = team_player['values']
-        # team_match_vals = team_match['values']
 
         team_player_vals = tf.layers.dropout(tf.reshape(team_player['values'], [-1, self.units_in]), rate=self.dropout_rate, training=is_training)
         team_player_vals = tf.reshape(team_player_vals, [-1])

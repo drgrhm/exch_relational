@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-# from layers import
 
 class Model:
 
@@ -11,11 +10,11 @@ class Model:
         layers = kwargs['layers']
         self.num_layers = len(layers)
         self.layers = {}
-        units_in = 1
+        units_in = kwargs['units_in']
 
         for l, layer in enumerate(layers):
             name = 'layer_' + str(l)
-            units_out = layer['units']
+            units_out = layer['units_out']
             activation = layer.get('activation', None)
             skip_connections = layer.get('skip_connections', False)
             self.layers[name] = layer['type'](units=[units_in, units_out], pool_mode=pool_mode, dropout_rate=dropout_rate, activation=activation, skip_connections=skip_connections, scope=name)
