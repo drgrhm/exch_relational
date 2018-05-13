@@ -13,10 +13,30 @@ from model import Model
 from layers import ExchangeableLayer, FeatureDropoutLayer
 
 
-## Noise mask has 0's corresponding to values to be predicted
-def table_rmse_loss(values, values_out, noise_mask):
-    prediction_mask = tf.cast(1 - noise_mask, tf.float32)
-    return tf.sqrt( tf.reduce_sum(((values - values_out)**2)*prediction_mask) / (tf.reduce_sum(prediction_mask) + 1e-10) )
+# ## Noise mask has 0's corresponding to values to be predicted
+# def table_rmse_loss(values, values_out, noise_mask):
+#     prediction_mask = tf.cast(1 - noise_mask, tf.float32)
+#     return tf.sqrt( tf.reduce_sum(((values - values_out)**2)*prediction_mask) / (tf.reduce_sum(prediction_mask) + 1e-10) )
+
+
+def table_prediction_rmse_loss(values, values_out, noise_mask, num_features):
+    # prediction_mask = tf.cast(1 - noise_mask, tf.float32)
+
+    prediction_mask = tf.reshape(tf.cast(1 - noise_mask, tf.float32), [-1,num_features])
+    vals = tf.reshape(values, [-1,num_features]) * prediction_mask
+    vals_out = tf.reshape(values_out, [-1,num_features]) * prediction_mask
+
+    num_vals = tf.shape(vals)[0]
+    categories = tf.cast(tf.reshape(tf.tile(tf.range(num_features), [num_vals]), [-1,num_features]), tf.float32)
+
+    preds = tf.reduce_sum(vals * categories, axis=1)
+    preds_out = tf.reduce_sum(vals_out * categories, axis=1)
+
+    num_vals_prediction = tf.reduce_sum(prediction_mask) / num_features
+
+    return tf.sqrt(tf.reduce_sum( ((preds - preds_out)**2) ) / num_vals_prediction)
+
+
 
 
 def table_cross_entropy_loss(values, values_out, noise_mask, num_features):
@@ -27,19 +47,18 @@ def table_cross_entropy_loss(values, values_out, noise_mask, num_features):
     
 
 
-def table_ordinal_hinge_loss(values, values_out, noise_mask):
-    prediction_mask = tf.cast(1 - noise_mask, tf.float32)
-    vals = tf.reshape(values, [-1,d])
-    ones = tf.ones_like(vals)
-    preds = tf.cast(tf.where(tf.equal(vals, ones))[:,1][:,None], tf.float32)
-    preds = preds + tf.ones_like(preds)
-
-    vals_out = tf.reshape(values_out, [-1,d])
-    preds_out = tf.cast(tf.where(tf.equal(vals_out, ones))[:,1][:,None], tf.float32)
-    preds_out = preds_out + tf.ones_like(preds_out)
+def table_ordinal_hinge_loss(values, values_out, noise_mask, num_features):
+    
+    prediction_mask = tf.reshape(tf.cast(1 - noise_mask, tf.float32), [-1,num_features])
+    
+    vals = tf.reshape(values, [-1,num_features]) * prediction_mask
+    vals_out = tf.reshape(values_out, [-1,num_features]) * prediction_mask
 
     num_vals = tf.shape(vals)[0]
-    categories = tf.cast(tf.reshape(tf.tile(tf.range(1,d+1), [num_vals]), [-1,d]), tf.float32)
+    categories = tf.cast(tf.reshape(tf.tile(tf.range(num_features), [num_vals]), [-1,num_features]), tf.float32)
+
+    preds = tf.reduce_sum(vals * categories, axis=1)[:,None]
+    preds_out = tf.reduce_sum(vals_out * categories, axis=1)[:,None]
 
     greater = tf.cast(tf.greater_equal(categories, preds), tf.float32)
     less = tf.cast(tf.less_equal(categories, preds), tf.float32)
@@ -49,7 +68,7 @@ def table_ordinal_hinge_loss(values, values_out, noise_mask):
     preds_out = (preds_out + 1) * not_equal
     out = categories * (less - greater) + preds_out
     out = tf.maximum(out, tf.zeros_like(out))
-    out = tf.reduce_sum(out, axis=1) * prediction_mask
+    out = tf.reduce_sum(out, axis=1)
 
     return tf.reduce_sum(out)
 
@@ -143,13 +162,16 @@ def main(opts, restore_point=None):
         team_player_out_tr, team_match_out_tr = model.get_output(team_player, team_match)
         team_player_out_vl, team_match_out_vl = model.get_output(team_player, team_match, reuse=True, is_training=False)
 
-        rec_loss_tr = 0
-        rec_loss_tr += table_cross_entropy_loss(team_match_values, team_match_out_tr['values'], team_match_noise_mask, opts['model_opts']['units_out'])
+        
+        # rec_loss_tr = table_cross_entropy_loss(team_match_values, team_match_out_tr['values'], team_match_noise_mask, opts['model_opts']['units_out'])
+        rec_loss_tr = table_ordinal_hinge_loss(team_match_values, team_match_out_tr['values'], team_match_noise_mask, opts['model_opts']['units_out'])
+        # rec_loss_tr = table_prediction_rmse_loss(team_match_values, team_match_out_tr['values'], team_match_noise_mask, opts['model_opts']['units_out'])
         reg_loss = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
         total_loss_tr = rec_loss_tr + opts['regularization_rate']*reg_loss
-
-        rec_loss_vl = 0
-        rec_loss_vl += table_cross_entropy_loss(team_match_values, team_match_out_vl['values'], team_match_noise_mask, opts['model_opts']['units_out'])
+        
+        # rec_loss_vl = table_cross_entropy_loss(team_match_values, team_match_out_vl['values'], team_match_noise_mask, opts['model_opts']['units_out'])
+        rec_loss_vl = table_ordinal_hinge_loss(team_match_values, team_match_out_vl['values'], team_match_noise_mask, opts['model_opts']['units_out'])
+        # rec_loss_vl = table_prediction_rmse_loss(team_match_values, team_match_out_vl['values'], team_match_noise_mask, opts['model_opts']['units_out'])
 
         train_step = tf.train.AdamOptimizer(opts['learning_rate']).minimize(total_loss_tr)
         # train_step = tf.train.GradientDescentOptimizer(opts['learning_rate']).minimize(total_loss_tr)
@@ -172,7 +194,6 @@ def main(opts, restore_point=None):
 
         accuracies_tr = []
         accuracies_vl = []
-        accuracies_vl_baseline = []
 
         accuracy_vl_best = 0
         accuracy_vl_best_ep = 0
@@ -251,15 +272,6 @@ def main(opts, restore_point=None):
             pred_accuracy_vl = one_hot_prediction_accuracy(data.team_match.values_tr_vl, team_match_vals_out_vl, noise_out, num_features)
             accuracies_vl.append(pred_accuracy_vl)
 
-
-            print('MEANS ', means)
-
-            random_out = np.zeros([num_vals, num_features])
-            random_out[np.arange(num_vals), np.random.choice(range(num_features), size=num_vals, p=means)] = 1
-            random_out = np.reshape(random_out, [-1])
-            pred_accuracy_vl_baseline = one_hot_prediction_accuracy(data.team_match.values_tr_vl, random_out, noise_out, num_features)
-            accuracies_vl_baseline.append(pred_accuracy_vl_baseline)
-
             if pred_accuracy_vl > accuracy_vl_best:
                 accuracy_vl_best = pred_accuracy_vl
                 accuracy_vl_best_ep = ep
@@ -290,12 +302,11 @@ def main(opts, restore_point=None):
         plt.title('Prediction Accuracy')
         plt.plot(range(opts['epochs'])[-show_last:], [.46 for _ in range(opts['epochs'])[-show_last:]], '.-', color='pink')
         plt.plot(range(opts['epochs'])[-show_last:], [.53 for _ in range(opts['epochs'])[-show_last:]], '.-', color='yellow')
-        plt.plot(range(opts['epochs'])[-show_last:], accuracies_vl_baseline[-show_last:], '.-', color='red')
         plt.plot(range(opts['epochs'])[-show_last:], accuracies_tr[-show_last:], '.-', color='blue')
         plt.plot(range(opts['epochs'])[-show_last:], accuracies_vl[-show_last:], '.-', color='green')
         plt.xlabel('epoch')
         plt.ylabel('Accuracy')
-        plt.legend(( 'baseline', 'experts', 'random', 'training prediction', 'validation prediction'))        
+        plt.legend(( 'baseline', 'experts', 'training prediction', 'validation prediction'))        
         # plt.show()
         plt.savefig("pred.pdf", bbox_inches='tight')
 
@@ -310,13 +321,13 @@ if __name__ == "__main__":
     
     one_hot = True
     units_in = 3
-    units = 128
+    units = 256
     units_out = units_in
 
     # activation = tf.nn.relu
     activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
     dropout_rate = 0.2
-    skip_connections = False
+    skip_connections = True
 
     auto_restore = False
     save_model = False
@@ -340,10 +351,10 @@ if __name__ == "__main__":
                                     {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
                                     {'type':FeatureDropoutLayer, 'units_out':units},
                                     {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},                                  
+                                    {'type':FeatureDropoutLayer, 'units_out':units},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units_out':units},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},                                      
                                     {'type':ExchangeableLayer, 'units_out':units_out,  'activation':None},
                                    ],
                          },
