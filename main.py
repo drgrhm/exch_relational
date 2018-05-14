@@ -32,8 +32,9 @@ def table_prediction_accuracy(indices, values, values_rec, shape, split):
     preds_out = (np.abs(vals_out[:,0]) + np.abs(vals_out[:,1]) ) / 2
     preds_out = np.sign(np.round(np.sign(vals_out[:,0]) * preds_out, decimals=1)) ## TODO better way 
 
-    # print('preds_in:  ', preds_in[0:20].astype(np.float32))
-    # print('preds_out: ', preds_out[0:20])
+    print("")
+    print('preds_in:  ', preds_in[100:130].astype(np.float32))
+    print('preds_out: ', preds_out[100:130])
 
     return np.sum(preds_in == preds_out) / num_vals
 
@@ -173,6 +174,9 @@ def main(opts, restore_point=None):
         accuracies_tr = []
         accuracies_vl = []
 
+        accuracy_tr_best = 0
+        accuracy_tr_best_ep = 0
+
         accuracy_vl_best = 0
         accuracy_vl_best_ep = 0
 
@@ -181,14 +185,9 @@ def main(opts, restore_point=None):
             if opts['verbosity'] > 0:
                 print('------- epoch:', ep, '-------')
 
-            # team_player_noise = make_noise_mask(opts['noise_rate'], data.team_player.num_values_tr) 
-            # team_player_values_noisy = np.copy(data.team_player.values_tr)
-            # team_player_values_noisy[team_player_noise == 0] = noise_value
-
             team_player_noise = np.ones_like(data.team_player.values_tr)
             team_player_values_noisy = np.copy(data.team_player.values_tr)
 
-            # team_match_noise = make_uniform_noise_mask(opts['noise_rate'], data.team_match.num_values_tr) 
             team_match_noise = make_by_col_noise_mask(opts['noise_rate'], data.team_match.num_values_tr, data.team_match.shape, data.team_match.indices_tr[:,1]) 
             team_match_values_noisy = np.copy(data.team_match.values_tr)
             team_match_values_noisy[team_match_noise == 0] = noise_value
@@ -211,10 +210,9 @@ def main(opts, restore_point=None):
             pred_accuracy_tr = table_prediction_accuracy(data.team_match.indices_tr, data.team_match.values_tr, team_match_vals_out_tr, data.team_match.shape, team_match_noise)
             accuracies_tr.append(pred_accuracy_tr)
 
-
-            # team_player_noise = 1 - data.team_player.split[data.team_player.split <= 1]
-            # team_player_values_noisy = data.team_player.values_tr_vl
-            # team_player_values_noisy[team_player_noise == 0] = noise_value
+            if pred_accuracy_tr > accuracy_tr_best:
+                accuracy_tr_best = pred_accuracy_tr
+                accuracy_tr_best_ep = ep
 
             team_player_noise = np.ones_like(data.team_player.values_tr_vl)
             team_player_values_noisy = np.copy(data.team_player.values_tr_vl)
@@ -258,13 +256,12 @@ def main(opts, restore_point=None):
 
             
             if opts['verbosity'] > 0:
-                # print("epoch {:5d}. training loss: {:5.15f} \t validation loss: {:5.5f} \t predicting mean: {:5.5f} \t train accuracy rate: {:5.5f} \t val accuracy rate: {:5.5f}".format(ep+1, loss_tr, loss_vl, loss_vl_mean, pred_accuracy_tr, pred_accuracy_vl))
-                print("epoch {:5d}. train accuracy rate: {:5.5f} \t val accuracy rate: {:5.5f} \t best val accuracy rate: {:5.5f} at epoch {:5d}".format(ep, pred_accuracy_tr, pred_accuracy_vl, accuracy_vl_best, accuracy_vl_best_ep))
+                print("epoch {:5d}. train accuracy rate: {:5.5f} \t val accuracy rate: {:5.5f} \t best train accuracy rate: {:5.5f} at epoch {:5d} \t best val accuracy rate: {:5.5f} at epoch {:5d}".format(ep, pred_accuracy_tr, pred_accuracy_vl, accuracy_tr_best, accuracy_tr_best_ep, accuracy_vl_best, accuracy_vl_best_ep))
 
         
 
-        show_last = opts['epochs']
-        # show_last = 2000
+        # show_last = opts['epochs']
+        show_last = 4000
         plt.title('RMSE Loss')
         plt.plot(range(opts['epochs'])[-show_last:], losses_tr[-show_last:], '.-', color='blue')
         plt.plot(range(opts['epochs'])[-show_last:], losses_vl[-show_last:], '.-', color='green')
@@ -283,7 +280,7 @@ def main(opts, restore_point=None):
         plt.plot(range(opts['epochs'])[-show_last:], [.53 for _ in range(opts['epochs'])[-show_last:]], '.-', color='yellow')
         plt.xlabel('epoch')
         plt.ylabel('Accuracy')
-        plt.legend(('training prediction', 'validation prediction', 'baseline', 'experts'))        
+        plt.legend(('training prediction', 'validation prediction', 'baseline', 'experts'))
         # plt.show()
         plt.savefig("pred.pdf", bbox_inches='tight')
 
@@ -294,32 +291,31 @@ if __name__ == "__main__":
 
 
     units = 256
-    activation = tf.nn.relu
+    # activation = tf.nn.relu
+    activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
     dropout_rate = 0.2
     auto_restore = False
     save_model = False
     skip_connections = True
 
 
-    opts = {'epochs':1500,
+    opts = {'epochs':10000,
             'data_split':[.8, .2, .0], # train, validation, test split
             'noise_rate':dropout_rate, # match vl/tr or ts/(tr+vl) ?
             'regularization_rate':.00001,
-            'learning_rate':.0001,
+            'learning_rate':.0005,
             'layer_opts':{'pool_mode':'mean',
                           'dropout_rate':dropout_rate,
                           'layers':[{'type':ExchangeableLayer, 'units':units, 'activation':activation},
-                                    {'type':FeatureDropoutLayer, 'units':units},
+                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},   
+                                    # {'type':FeatureDropoutLayer, 'units':units},
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':FeatureDropoutLayer, 'units':units},             
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':FeatureDropoutLayer, 'units':units},             
+                                    # {'type':FeatureDropoutLayer, 'units':units},
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':FeatureDropoutLayer, 'units':units},             
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':FeatureDropoutLayer, 'units':units},             
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':FeatureDropoutLayer, 'units':units},             
+                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
                                     {'type':ExchangeableLayer, 'units':1,  'activation':None},
                                    ],
