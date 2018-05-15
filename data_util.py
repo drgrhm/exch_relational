@@ -1,34 +1,34 @@
 import numpy as np
 import sqlite3
 from itertools import groupby
+from util import *
+
 
 class DataLoader:
 
-    def __init__(self, data_folder, tr, vl, ts):
+    def __init__(self, data_folder, data_set, split_sizes, num_features, team_match_one_hot=False):
 
         self.data_folder = data_folder
-        self.team_player, self.team_match = self._load_tables(tr, vl, ts)
+        self.data_set = data_set
+        self.team_player, self.team_match = self._load_tables(split_sizes, num_features, team_match_one_hot)
 
 
-    def _load_tables(self, tr, vl, ts):
+    def _load_tables(self, split_sizes, num_features, team_match_one_hot=False):
         
-        # data = 'sample'
-        data = 'soccer'
-
-        if data == 'sample':
+        if self.data_set == 'debug':
 
             inds0 = np.array([ [0,0],[0,2],[0,3],[1,0],[1,2],[2,1],[2,3],[3,1],[3,2],[3,3],[4,0],[4,1],[4,2],[5,1],[5,3] ])
             vals0 = np.array([ 1,0,1,1,0,0,1,0,1,1,0,1,0,1,1 ])
             shape0 = np.array([6,4])
-            table0 = Table(0, inds0, vals0, shape0, tr, vl, ts)
+            table0 = Table(0, inds0, vals0, shape0, [1.0, 0.0, 0.0], num_features=num_features)
 
 
             inds1 = np.array([ [0,0],[0,2],[1,3],[2,0],[2,4],[3,3],[3,4],[4,1],[5,1],[5,2] ])
-            vals1 = np.array([ 3,2,0.1,-3,-1,-0.1,1,-2,2,-2 ])
+            vals1 = np.array([ 3,2,0,-3,-1,0,1,-2,2,-2 ])
             shape1 = np.array([6,5])
-            table1 = Table(1, inds1, vals1, shape1, tr, vl, ts, split_mode='by_col')
+            table1 = Table(1, inds1, vals1, shape1, split_sizes, num_features=num_features, one_hot=team_match_one_hot, split_mode='by_col')
 
-        elif data == 'soccer':
+        elif self.data_set == 'soccer':
 
             entities_map = {'player':0, 'team':1, 'match':2}
             player_map = {} ## map SQL id's to rows/cols of data matrices 
@@ -92,20 +92,20 @@ class DataLoader:
             team_player = np.array(team_player)
             team_match = np.array(team_match)
 
-            table0 = Table(0, team_player[:,0:2], team_player[:,2], np.array([n_teams, n_players]), 1. - vl/tr, vl/tr, .0)
-            table1 = Table(1, team_match[:,0:2], team_match[:,2], np.array([n_teams, n_matches]), tr, vl, ts, split_mode='by_col')
+            # table0 = Table(0, team_player[:,0:2], team_player[:,2], np.array([n_teams, n_players]), 1. - vl/tr, vl/tr, .0)
+            table0 = Table(0, team_player[:,0:2], team_player[:,2], np.array([n_teams, n_players]), [1.0, 0.0, 0.0], num_features)
+            table1 = Table(1, team_match[:,0:2], team_match[:,2], np.array([n_teams, n_matches]), split_sizes, num_features, team_match_one_hot, split_mode='by_col')
 
             conn.close()
 
         return table0, table1
-
-
+        
 
 
 class Table:
 
-    def __init__(self, tid, indices, values, shape, tr, vl, ts, split_mode='uniform'):
-
+    def __init__(self, tid, indices, values, shape, split_sizes, num_features, one_hot=False, split_mode='uniform'):
+        tr, vl, ts = split_sizes
         assert tr+vl+ts == 1, "(" + str(tr) + ", " + str(vl) + ", " + str(ts) + ") is not a valid train/valid/test split"
         n = values.shape[0]
 
@@ -130,96 +130,67 @@ class Table:
             n_tr = n - n_ts - n_vl
 
 
-            # split = np.concatenate((np.zeros(n_tr, np.int32), np.ones(n_vl, np.int32), 2*np.ones(n_ts, np.int32)))
-            # np.random.shuffle(split)       
-
-            # print('split: ', np.sum(split))
-            # print('AA_split: ', np.sum(AA_split))
 
 
+        # if one_hot:
+        #     split = np.array([i for i in split for _ in range(num_features)])
+        #     indices = expand_indices(indices, num_features)
+        #     new_vals = []
+        #     for val in values:
+        #         if val > 0:
+        #             new_vals.append([1,0,0])
+        #         elif val < 0:
+        #             new_vals.append([0,0,1])
+        #         elif val == 0:
+        #             new_vals.append([0,1,0])
+        #     new_vals = np.reshape(np.array(new_vals), [-1])
+        #     values = new_vals
 
-        elif split_mode == 'by_row':
-            print("TODO: implement")
 
-        self._set_data_splits(indices, values, split)
+
+        if num_features > 1:
+            # split = np.array([i for i in split for _ in range(num_features)])
+            # indices = expand_indices(indices, num_features)
+
+            if one_hot: # TODO fix so generalizes better i.e. not just 3 features 
+                new_vals = []
+                for val in values:
+                    if val > 0:
+                        new_vals.append([1,0,0])
+                    elif val < 0:
+                        new_vals.append([0,0,1])
+                    elif val == 0:
+                        new_vals.append([0,1,0])
+            else:
+                new_vals = np.array([[val,0,0] for val in values])
+
+            new_vals = np.reshape(np.array(new_vals), [-1])
+            values = new_vals
+
+
+        self._set_data_splits(indices, values, split, num_features)
         self.shape = shape
         self.mean_tr = np.mean(self.values_tr)
         self.num_values_tr = n_tr
         self.num_values = n
-        
 
-    def _set_data_splits(self, indices, values, split):
+
+    def _set_data_splits(self, indices, values, split, num_features):
         self.indices_all = indices
         self.indices_tr = indices[split == 0]
         self.indices_vl = indices[split == 1]
         self.indices_tr_vl = indices[split <= 1]
         self.indices_ts = indices[split == 2]
+        self.split = split
+        
+        split = np.array([i for i in split for _ in range(num_features)])
 
         self.values_all = values
         self.values_tr = values[split == 0]
         self.values_vl = values[split == 1]
         self.values_tr_vl = values[split <= 1]
         self.values_ts = values[split == 2]
-
-        self.split = split
-
-
-    # def transpose(self):
-    #     trans = np.concatenate((self.indices_all, self.values_all[:,None], self.split[:,None]), axis=1)
-    #     trans[:,[0,1,2,3]] = trans[:,[1,0,2,3]]        
-    #     trans = list(trans)
-    #     trans.sort(key=lambda row: row[0])
-    #     trans = np.array(trans)
-
-    #     inds = trans[:,0:2]
-    #     vals = trans[:,2]
-    #     split = trans[:,3]
-
-    #     self._set_data_splits(inds, vals, split)
-
-    #     self.shape[[0,1]] = self.shape[[1,0]]
-
-
-
-
-
-
-
-
-
-# # For debugging
-# def sparse_array_to_dense(indices, values, shape, num_features):
-#     out = np.zeros(list(shape) + [num_features])
-#     inds = expand_array_indices(indices, num_features)
-#     inds = list(zip(*inds))
-#     out[inds] = values
-#     return out
-
-# # For debugging
-# def expand_array_indices(indices, num_features):    
-#     num_vals = indices.shape[0]
-#     inds_exp = np.reshape(np.tile(range(num_features), reps=[num_vals]), newshape=[-1, 1]) # expand dimension of mask indices
-#     inds = np.tile(indices, reps=[num_features,1]) # duplicate indices num_features times
-#     inds = np.reshape(inds, newshape=[num_features, num_vals, 2])
-#     inds = np.reshape(np.transpose(inds, axes=[1,0,2]), newshape=[-1,2])
-#     inds = np.concatenate((inds, inds_exp), axis=1)
-#     return inds
-
-# def sparse_transpose(indices, values, shape):
-#     trans = np.concatenate((indices, values[:,None]), axis=1)
-#     trans[:,[0,1,2]] = trans[:,[1,0,2]]
-#     trans = list(trans)
-#     trans.sort(key=lambda row: row[0])
-#     trans = np.array(trans)    
-#     inds = trans[:,0:2]
-#     vals = trans[:,2]
-#     shape[[0,1]] = shape[[1,0]]
-#     return {'indices':inds, 'values':vals, 'shape':shape}
-
-
-
-
-
+        
 
 
 
