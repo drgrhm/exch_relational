@@ -58,6 +58,8 @@ class DataLoader:
             team_match = []
             team_player = []
 
+            max_goals = 0
+
             for i, match in enumerate(matches):
                 match_id, home_team_id, away_team_id, home_team_goal, away_team_goal = match[0:5]
                 home_team_id = team_map[home_team_id]
@@ -68,8 +70,17 @@ class DataLoader:
                 match_map[match_id] = i
                 match_id = i
 
-                team_match.append( [home_team_id, match_id, home_team_goal-away_team_goal] )
-                team_match.append( [away_team_id, match_id, away_team_goal-home_team_goal] )
+                # team_match.append( [home_team_id, match_id, home_team_goal-away_team_goal] )
+                # team_match.append( [away_team_id, match_id, away_team_goal-home_team_goal] )
+
+                # if home_team_goal > max_goals:
+                #     max_goals = home_team_goal
+                # if away_team_goal > max_goals:
+                #     max_goals = away_team_goal
+
+
+                team_match.append( [home_team_id, match_id, home_team_goal] )
+                team_match.append( [away_team_id, match_id, away_team_goal] )
 
                 for player_id in home_player_ids:
                     if player_id != None:
@@ -79,6 +90,8 @@ class DataLoader:
                     if player_id != None:
                         team_player.append( [away_team_id, player_map[player_id], 1] )
             n_matches = i + 1
+
+            # print('Max goals: ', max_goals)
 
             team_match.sort()
             team_player.sort()

@@ -23,20 +23,25 @@ def table_prediction_accuracy(indices, values, values_rec, shape, split):
     out_t = sparse_transpose(indices, values_rec, shape, split)
     vals_in_t = in_t['values']
     vals_out_t = out_t['values']
-    noise = 1 - in_t['split']            
+    noise = 1 - in_t['split']
 
-    preds_in = np.sign(np.reshape(vals_in_t[noise == 0], [-1,2])[:,0])
+    vals_in_t = np.reshape(vals_in_t[noise == 0], [-1,2])
+
+    preds_in = np.sign(vals_in_t[:,0] - vals_in_t[:,1])
     num_vals = preds_in.shape[0]
 
-    vals_out = np.reshape(vals_out_t[noise == 0], [-1,2])                    
-    preds_out = (np.abs(vals_out[:,0]) + np.abs(vals_out[:,1]) ) / 2
-    preds_out = np.sign(np.round(np.sign(vals_out[:,0]) * preds_out, decimals=1)) ## TODO better way 
+    vals_out_t = np.reshape(vals_out_t[noise == 0], [-1,2])
+    preds_out = np.sign(vals_out_t[:,0] - vals_out_t[:,1])
+
+    # preds_out = (np.abs(vals_out[:,0]) + np.abs(vals_out[:,1]) ) / 2
+    # preds_out = np.sign(np.round(np.sign(vals_out[:,0]) * preds_out, decimals=1)) ## TODO better way 
 
     # print("")
-    # print('preds_in:  ', preds_in[100:130].astype(np.float32))
-    # print('preds_out: ', preds_out[100:130])
+    # print('vals_in:  ', preds_in[0:20].astype(np.float32))
+    # print('vals_out: ', preds_out[0:20])
 
     return np.sum(preds_in == preds_out) / num_vals
+
 
 
 
@@ -311,6 +316,10 @@ if __name__ == "__main__":
                           'layers':[{'type':ExchangeableLayer, 'units':units, 'activation':activation},
                                     {'type':FeatureDropoutLayer, 'units':units},
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units':units},
+                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},  
+                                    {'type':FeatureDropoutLayer, 'units':units},
+                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},  
                                     {'type':FeatureDropoutLayer, 'units':units},
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},               
                                     {'type':ExchangeableLayer, 'units':1,  'activation':None},
