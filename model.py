@@ -12,7 +12,7 @@ class Model:
         regularization_rate = kwargs['regularization_rate']
         self.num_layers = len(layers)
         self.layers = {}
-        units_in = 1
+        units_in = kwargs['units_in']
 
         for l, layer in enumerate(layers):
             name = 'layer_' + str(l)

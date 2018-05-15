@@ -12,35 +12,44 @@ from layers import ExchangeableLayer, FeatureDropoutLayer
 
 
 ## Noise mask has 0's corresponding to values to be predicted
-def table_rmse_loss(values, values_rec, noise_mask):
-    non_noise = tf.cast(1 - noise_mask, tf.float32)
-    return tf.sqrt( tf.reduce_sum(((values - values_rec)**2)*non_noise) / (tf.reduce_sum(non_noise) + 1e-10) )
+def table_rmse_loss(values, values_out, noise_mask, num_features):
+
+    values = tf.reshape(values, [-1, num_features])[:,0]
+    values_out = tf.reshape(values_out, [-1, num_features])[:,0]
+
+    non_noise = tf.reshape(tf.cast(1 - noise_mask, tf.float32), [-1, num_features])[:,0]
 
 
-def table_prediction_accuracy(indices, values, values_rec, shape, split):
     
-    in_t = sparse_transpose(indices, values, shape, split)
-    out_t = sparse_transpose(indices, values_rec, shape, split)
-    vals_in_t = in_t['values']
-    vals_out_t = out_t['values']
-    noise = 1 - in_t['split']
+    return tf.sqrt( tf.reduce_sum((**2)*non_noise) / (tf.reduce_sum(non_noise) + 1e-10) )
 
-    vals_in_t = np.reshape(vals_in_t[noise == 0], [-1,2])
 
-    preds_in = np.sign(vals_in_t[:,0] - vals_in_t[:,1])
-    num_vals = preds_in.shape[0]
+def table_prediction_accuracy(indices, values, values_out, shape, split):
+    
+    # in_t = sparse_transpose(indices, values, shape, split)
+    # out_t = sparse_transpose(indices, values_out, shape, split)
+    # vals_in_t = in_t['values']
+    # vals_out_t = out_t['values']
+    # noise = 1 - in_t['split']
 
-    vals_out_t = np.reshape(vals_out_t[noise == 0], [-1,2])
-    preds_out = np.sign(vals_out_t[:,0] - vals_out_t[:,1])
+    # vals_in_t = np.reshape(vals_in_t[noise == 0], [-1,2])
 
-    # preds_out = (np.abs(vals_out[:,0]) + np.abs(vals_out[:,1]) ) / 2
-    # preds_out = np.sign(np.round(np.sign(vals_out[:,0]) * preds_out, decimals=1)) ## TODO better way 
+    # preds_in = np.sign(vals_in_t[:,0] - vals_in_t[:,1])
+    # num_vals = preds_in.shape[0]
 
-    # print("")
-    # print('vals_in:  ', preds_in[0:20].astype(np.float32))
-    # print('vals_out: ', preds_out[0:20])
+    # vals_out_t = np.reshape(vals_out_t[noise == 0], [-1,2])
+    # preds_out = np.sign(vals_out_t[:,0] - vals_out_t[:,1])
 
-    return np.sum(preds_in == preds_out) / num_vals
+    # # preds_out = (np.abs(vals_out[:,0]) + np.abs(vals_out[:,1]) ) / 2
+    # # preds_out = np.sign(np.round(np.sign(vals_out[:,0]) * preds_out, decimals=1)) ## TODO better way 
+
+    # # print("")
+    # # print('vals_in:  ', preds_in[0:20].astype(np.float32))
+    # # print('vals_out: ', preds_out[0:20])
+
+    # return np.sum(preds_in == preds_out) / num_vals
+
+    return 0
 
 
 
@@ -113,7 +122,7 @@ def main(opts, restore_point=None):
     if opts['debug']:
         np.random.seed(12345)
 
-    data = DataLoader('data', tr, vl, ts)
+    data = DataLoader('data', opts['model_opts']['units_in'], opts['data_split'])
 
     # print(np.squeeze(sparse_array_to_dense(data.team_match.indices_all, data.team_match.values_all, data.team_match.shape, 1)))
     # print("")
@@ -151,13 +160,13 @@ def main(opts, restore_point=None):
 
         rec_loss_tr = 0
         # rec_loss_tr += table_rmse_loss(team_player_values, team_player_out_tr['values'], team_player_noise_mask)
-        rec_loss_tr += table_rmse_loss(team_match_values, team_match_out_tr['values'], team_match_noise_mask)
+        rec_loss_tr += table_rmse_loss(team_match_values, team_match_out_tr['values'], team_match_noise_mask, opts['model_opts']['units_in'])
         reg_loss = np.sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
         total_loss_tr = rec_loss_tr + reg_loss
 
         rec_loss_vl = 0
         # rec_loss_vl += table_rmse_loss(team_player_values, team_player_out_vl['values'], team_player_noise_mask)
-        rec_loss_vl += table_rmse_loss(team_match_values, team_match_out_vl['values'], team_match_noise_mask)
+        rec_loss_vl += table_rmse_loss(team_match_values, team_match_out_vl['values'], team_match_noise_mask, opts['model_opts']['units_in'])
 
         train_step = tf.train.AdamOptimizer(opts['learning_rate']).minimize(total_loss_tr)
         # train_step = tf.train.GradientDescentOptimizer(opts['learning_rate']).minimize(total_loss_tr)
@@ -194,8 +203,10 @@ def main(opts, restore_point=None):
             team_player_values_noisy = np.copy(data.team_player.values_tr)
 
             team_match_noise = make_by_col_noise_mask(opts['noise_rate'], data.team_match.num_values_tr, data.team_match.shape, data.team_match.indices_tr[:,1]) 
+            noise_in = np.array([i for i in team_match_noise for _ in range(opts['model_opts']['units_in'])])
+            noise_out = np.array([i for i in team_match_noise for _ in range(opts['model_opts']['units_out'])])
             team_match_values_noisy = np.copy(data.team_match.values_tr)
-            team_match_values_noisy[team_match_noise == 0] = noise_value
+            team_match_values_noisy[noise_in == 0] = noise_value
 
             tr_dict = {team_player['indices']:data.team_player.indices_tr, 
                        team_player['values']:team_player_values_noisy, # noisy values
@@ -204,7 +215,7 @@ def main(opts, restore_point=None):
 
                        team_match['indices']:data.team_match.indices_tr, 
                        team_match['values']:team_match_values_noisy, # noisy values
-                       team_match_noise_mask:team_match_noise,
+                       team_match_noise_mask:noise_out,
                        team_match_values:data.team_match.values_tr # clean values
                       }
 
@@ -223,8 +234,11 @@ def main(opts, restore_point=None):
             team_player_values_noisy = np.copy(data.team_player.values_tr_vl)
 
             team_match_noise = 1 - data.team_match.split[data.team_match.split <= 1]
+            noise_in = np.array([i for i in team_match_noise for _ in range(opts['model_opts']['units_in'])])
+            noise_out = np.array([i for i in team_match_noise for _ in range(opts['model_opts']['units_out'])])
+            
             team_match_values_noisy = np.copy(data.team_match.values_tr_vl)
-            team_match_values_noisy[team_match_noise == 0] = noise_value
+            team_match_values_noisy[noise_in == 0] = noise_value
 
             vl_dict = {team_player['indices']:data.team_player.indices_tr_vl, 
                        team_player['values']:team_player_values_noisy, # noisy values
@@ -233,7 +247,7 @@ def main(opts, restore_point=None):
 
                        team_match['indices']:data.team_match.indices_tr_vl, 
                        team_match['values']:team_match_values_noisy, # noisy values
-                       team_match_noise_mask:team_match_noise,
+                       team_match_noise_mask:noise_out,
                        team_match_values:data.team_match.values_tr_vl # clean values
                       }
             
@@ -306,21 +320,19 @@ if __name__ == "__main__":
     skip_connections = True
 
 
-    opts = {'epochs':2000,
+    opts = {'epochs':500,
             'data_split':[.8, .2, .0], # train, validation, test split
             'noise_rate':dropout_rate, # match vl/tr or ts/(tr+vl) ?            
             'learning_rate':.005,
             'model_opts':{'pool_mode':'mean',
                           'dropout_rate':dropout_rate,
                           'regularization_rate':regularization_rate,
+                          'units_in':2,
+                          'units_out':2,
                           'layers':[{'type':ExchangeableLayer, 'units':units, 'activation':activation},
-                                    {'type':FeatureDropoutLayer, 'units':units},
+                                    # {'type':FeatureDropoutLayer, 'units':units},
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':FeatureDropoutLayer, 'units':units},
-                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},  
-                                    {'type':FeatureDropoutLayer, 'units':units},
-                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},  
-                                    {'type':FeatureDropoutLayer, 'units':units},
+                                    # {'type':FeatureDropoutLayer, 'units':units},
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},               
                                     {'type':ExchangeableLayer, 'units':1,  'activation':None},
                                    ],

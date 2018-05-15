@@ -5,13 +5,13 @@ from itertools import groupby
 
 class DataLoader:
 
-    def __init__(self, data_folder, tr, vl, ts):
+    def __init__(self, data_folder, num_features, split_sizes):
 
         self.data_folder = data_folder
-        self.team_player, self.team_match = self._load_tables(tr, vl, ts)
+        self.team_player, self.team_match = self._load_tables(num_features, split_sizes)
 
 
-    def _load_tables(self, tr, vl, ts):
+    def _load_tables(self, num_features, split_sizes):
         
         # data = 'sample'
         data = 'soccer'
@@ -21,13 +21,13 @@ class DataLoader:
             inds0 = np.array([ [0,0],[0,2],[0,3],[1,0],[1,2],[2,1],[2,3],[3,1],[3,2],[3,3],[4,0],[4,1],[4,2],[5,1],[5,3] ])
             vals0 = np.array([ 1,0,1,1,0,0,1,0,1,1,0,1,0,1,1 ])
             shape0 = np.array([6,4])
-            table0 = Table(0, inds0, vals0, shape0, tr, vl, ts)
+            table0 = Table(0, inds0, vals0, shape0, num_features, split_sizes)
 
 
             inds1 = np.array([ [0,0],[0,2],[1,3],[2,0],[2,4],[3,3],[3,4],[4,1],[5,1],[5,2] ])
             vals1 = np.array([ 3,2,0.1,-3,-1,-0.1,1,-2,2,-2 ])
             shape1 = np.array([6,5])
-            table1 = Table(1, inds1, vals1, shape1, tr, vl, ts, split_mode='by_col')
+            table1 = Table(1, inds1, vals1, shape1, num_features, split_sizes, split_mode='by_col')
 
         elif data == 'soccer':
 
@@ -79,8 +79,8 @@ class DataLoader:
                 #     max_goals = away_team_goal
 
 
-                team_match.append( [home_team_id, match_id, home_team_goal] )
-                team_match.append( [away_team_id, match_id, away_team_goal] )
+                team_match.append( [home_team_id, match_id, home_team_goal, 1] )
+                team_match.append( [away_team_id, match_id, away_team_goal, 0] )
 
                 for player_id in home_player_ids:
                     if player_id != None:
@@ -106,8 +106,8 @@ class DataLoader:
             team_player = np.array(team_player)
             team_match = np.array(team_match)
 
-            table0 = Table(0, team_player[:,0:2], team_player[:,2], np.array([n_teams, n_players]), 1. - vl/tr, vl/tr, .0)
-            table1 = Table(1, team_match[:,0:2], team_match[:,2], np.array([n_teams, n_matches]), tr, vl, ts, split_mode='by_col')
+            table0 = Table(0, team_player[:,0:2], team_player[:,2], np.array([n_teams, n_players]), num_features, [1., .0, .0])
+            table1 = Table(1, team_match[:,0:2], team_match[:,2:4], np.array([n_teams, n_matches]), num_features, split_sizes, split_mode='by_col')
 
             conn.close()
 
@@ -118,8 +118,8 @@ class DataLoader:
 
 class Table:
 
-    def __init__(self, tid, indices, values, shape, tr, vl, ts, split_mode='uniform'):
-
+    def __init__(self, tid, indices, values, shape, num_features, split_sizes, split_mode='uniform'):
+        tr, vl, ts = split_sizes
         assert tr+vl+ts == 1, "(" + str(tr) + ", " + str(vl) + ", " + str(ts) + ") is not a valid train/valid/test split"
         n = values.shape[0]
 
@@ -144,27 +144,51 @@ class Table:
             n_tr = n - n_ts - n_vl
 
 
-        self._set_data_splits(indices, values, split)
+        # if num_features > 1:
+
+            # values = values[:,0]
+
+
+        new_vals = []
+        for val in values:
+            new_val = np.zeros(num_features)
+            if len(values.shape) > 1:
+                new_val[0:2] = val[0:2]
+            else:
+                new_val[0] = val
+            new_vals.append(new_val)
+
+        new_vals = np.reshape(np.array(new_vals), [-1])
+        values = new_vals
+
+
+
+
+
+
+
+        self._set_data_splits(indices, values, split, num_features)
         self.shape = shape
         self.mean_tr = np.mean(self.values_tr)
         self.num_values_tr = n_tr
         self.num_values = n
         
 
-    def _set_data_splits(self, indices, values, split):
+    def _set_data_splits(self, indices, values, split, num_features):
         self.indices_all = indices
         self.indices_tr = indices[split == 0]
         self.indices_vl = indices[split == 1]
         self.indices_tr_vl = indices[split <= 1]
         self.indices_ts = indices[split == 2]
+        self.split = split
+        
+        split = np.array([i for i in split for _ in range(num_features)])
 
         self.values_all = values
         self.values_tr = values[split == 0]
         self.values_vl = values[split == 1]
         self.values_tr_vl = values[split <= 1]
         self.values_ts = values[split == 2]
-
-        self.split = split
 
 
     # def transpose(self):
