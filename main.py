@@ -32,9 +32,9 @@ def table_prediction_accuracy(indices, values, values_rec, shape, split):
     preds_out = (np.abs(vals_out[:,0]) + np.abs(vals_out[:,1]) ) / 2
     preds_out = np.sign(np.round(np.sign(vals_out[:,0]) * preds_out, decimals=1)) ## TODO better way 
 
-    print("")
-    print('preds_in:  ', preds_in[100:130].astype(np.float32))
-    print('preds_out: ', preds_out[100:130])
+    # print("")
+    # print('preds_in:  ', preds_in[100:130].astype(np.float32))
+    # print('preds_out: ', preds_out[100:130])
 
     return np.sum(preds_in == preds_out) / num_vals
 
@@ -124,7 +124,7 @@ def main(opts, restore_point=None):
         if opts['debug']:
             tf.set_random_seed(12345)
 
-        model = Model(**opts['layer_opts'])
+        model = Model(**opts['model_opts'])
 
         team_player = {}
         team_player['indices'] = tf.placeholder(tf.int32, shape=(None, 2), name='team_player_indices')
@@ -147,8 +147,8 @@ def main(opts, restore_point=None):
         rec_loss_tr = 0
         # rec_loss_tr += table_rmse_loss(team_player_values, team_player_out_tr['values'], team_player_noise_mask)
         rec_loss_tr += table_rmse_loss(team_match_values, team_match_out_tr['values'], team_match_noise_mask)
-        reg_loss = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-        total_loss_tr = rec_loss_tr + opts['regularization_rate']*reg_loss
+        reg_loss = np.sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
+        total_loss_tr = rec_loss_tr + reg_loss
 
         rec_loss_vl = 0
         # rec_loss_vl += table_rmse_loss(team_player_values, team_player_out_vl['values'], team_player_noise_mask)
@@ -163,9 +163,9 @@ def main(opts, restore_point=None):
         if restore_point is not None:
             saver.restore(sess, restore_point)
 
-        if opts['layer_opts']['pool_mode'] == 'mean':
+        if opts['model_opts']['pool_mode'] == 'mean':
             noise_value = 0
-        if opts['layer_opts']['pool_mode'] == 'max':
+        if opts['model_opts']['pool_mode'] == 'max':
             noise_value = -1e10
 
         losses_tr = []
@@ -261,7 +261,7 @@ def main(opts, restore_point=None):
         
 
         # show_last = opts['epochs']
-        show_last = 4000
+        show_last = 1900
         plt.title('RMSE Loss')
         plt.plot(range(opts['epochs'])[-show_last:], losses_tr[-show_last:], '.-', color='blue')
         plt.plot(range(opts['epochs'])[-show_last:], losses_vl[-show_last:], '.-', color='green')
@@ -290,33 +290,29 @@ if __name__ == "__main__":
     np.set_printoptions(suppress=True,linewidth=np.nan,threshold=np.nan)
 
 
-    units = 256
-    # activation = tf.nn.relu
-    activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
+    units = 128
+    # activation = tf.nn.tanh
+    activation = tf.nn.relu
+    # activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
     dropout_rate = 0.2
+    regularization_rate = 0.0001
     auto_restore = False
     save_model = False
     skip_connections = True
 
 
-    opts = {'epochs':10000,
+    opts = {'epochs':2000,
             'data_split':[.8, .2, .0], # train, validation, test split
-            'noise_rate':dropout_rate, # match vl/tr or ts/(tr+vl) ?
-            'regularization_rate':.00001,
-            'learning_rate':.0005,
-            'layer_opts':{'pool_mode':'mean',
+            'noise_rate':dropout_rate, # match vl/tr or ts/(tr+vl) ?            
+            'learning_rate':.005,
+            'model_opts':{'pool_mode':'mean',
                           'dropout_rate':dropout_rate,
+                          'regularization_rate':regularization_rate,
                           'layers':[{'type':ExchangeableLayer, 'units':units, 'activation':activation},
-                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},   
-                                    # {'type':FeatureDropoutLayer, 'units':units},
+                                    {'type':FeatureDropoutLayer, 'units':units},
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':FeatureDropoutLayer, 'units':units},
-                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units':units},
+                                    {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},               
                                     {'type':ExchangeableLayer, 'units':1,  'activation':None},
                                    ],
                          },

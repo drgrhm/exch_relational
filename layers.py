@@ -135,6 +135,7 @@ class ExchangeableLayer(Layer):
         self.activation = kwargs['activation']
         self.skip_connections = kwargs.get('skip_connections', False)
         self.scope = kwargs['scope']
+        self.regularization_rate = kwargs['regularization_rate']
         self.params = {}
 
 
@@ -143,51 +144,76 @@ class ExchangeableLayer(Layer):
         units_out = self.units_out
         params = self.params
 
-        with tf.variable_scope(self.scope, initializer=tf.random_normal_initializer(0, .01), reuse=reuse):
-            
-            params['theta_000'] = tf.get_variable(name='theta_000', shape=[units_in, units_out])
-            params['theta_001'] = tf.get_variable(name='theta_001', shape=[units_in, units_out])
-            params['theta_010'] = tf.get_variable(name='theta_010', shape=[units_in, units_out])
-            params['theta_011'] = tf.get_variable(name='theta_011', shape=[units_in, units_out])
-            params['theta_100'] = tf.get_variable(name='theta_100', shape=[units_in, units_out])
-            params['theta_101'] = tf.get_variable(name='theta_101', shape=[units_in, units_out])
-            params['theta_110'] = tf.get_variable(name='theta_110', shape=[units_in, units_out])
-            params['theta_111'] = tf.get_variable(name='theta_111', shape=[units_in, units_out])
+        with tf.variable_scope(self.scope, 
+                               initializer=tf.random_normal_initializer(0, .01),
+                               regularizer=tf.contrib.keras.regularizers.l2(self.regularization_rate),
+                               reuse=reuse):
+            regularizer = tf.contrib.layers.l2_regularizer
+            params['theta_team_player_00'] = tf.get_variable(name='theta_team_player_00', shape=[units_in, units_out])
+            params['theta_team_player_01'] = tf.get_variable(name='theta_team_player_01', shape=[units_in, units_out])
+            params['theta_team_player_10'] = tf.get_variable(name='theta_team_player_10', shape=[units_in, units_out])
+            params['theta_team_player_11'] = tf.get_variable(name='theta_team_player_11', shape=[units_in, units_out])
 
+            params['theta_team_player_inter_0'] = tf.get_variable(name='theta_team_player_inter_0', shape=[units_in, units_out])
+            params['theta_team_player_inter_1'] = tf.get_variable(name='theta_team_player_inter_1', shape=[units_in, units_out])
+
+
+            params['theta_team_match_00'] = tf.get_variable(name='theta_team_match_00', shape=[units_in, units_out])
+            params['theta_team_match_01'] = tf.get_variable(name='theta_team_match_01', shape=[units_in, units_out])
+            params['theta_team_match_10'] = tf.get_variable(name='theta_team_match_10', shape=[units_in, units_out])
+            params['theta_team_match_11'] = tf.get_variable(name='theta_team_match_11', shape=[units_in, units_out])            
+
+            params['theta_team_match_inter_0'] = tf.get_variable(name='theta_team_match_inter_0', shape=[units_in, units_out])
+            params['theta_team_match_inter_1'] = tf.get_variable(name='theta_team_match_inter_1', shape=[units_in, units_out])
+
+
+            team_player_vals = tf.reshape(tf.matmul(tf.reshape(team_player['values'], shape=[-1,units_in]), params['theta_team_player_00']), [-1])
 
             team_player_marg_01 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=0, keep_dims=True) # team-player table, marginalized over teams [1 x N_players x units]       
-            team_player_marg_10 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-player table, marginalized over players [N_teams x 1 x units]
-            team_player_marg_11 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-player table, marginalized over both [1 x 1 x units]
-
-            team_match_marg_01 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=0, keep_dims=True) # team-match table, marginalized over teams [1 x N_matches x units]       
-            team_match_marg_10 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-match table, marginalized over matches [N_teams x 1 x units]
-            team_match_marg_11 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-match table, marginalized over both [1 x 1 x units]
-
-
-            team_player_vals_01 = tf.tensordot(team_player_marg_01, params['theta_101'], axes=1) #[1 x N_players x K]
-            team_player_vals_10 = tf.tensordot(team_player_marg_10, params['theta_110'], axes=1) #[N_teams x 1 x K]
-            team_player_vals_11 = tf.tensordot(team_player_marg_11, params['theta_111'], axes=1) #[1 x 1 x K]
-
-            team_match_vals_01 = tf.tensordot(team_match_marg_01, params['theta_011'], axes=1) #[1 x 1 x K]
-            team_match_vals_10 = tf.tensordot(team_match_marg_10, params['theta_110'], axes=1) #[N_teams x 1 x K]
-            team_match_vals_11 = tf.tensordot(team_match_marg_11, params['theta_111'], axes=1) #[1 x 1 x K]
-
-
-            team_player_vals = tf.reshape(tf.matmul(tf.reshape(team_player['values'], shape=[-1,units_in]), params['theta_100']), [-1])
+            team_player_vals_01 = tf.tensordot(team_player_marg_01, params['theta_team_player_01'], axes=1) #[1 x N_players x K]
             team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_01, team_player['indices'], axis=0)
+
+            team_player_marg_10 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-player table, marginalized over players [N_teams x 1 x units]
+            team_player_vals_10 = tf.tensordot(team_player_marg_10, params['theta_team_player_10'], axes=1) #[N_teams x 1 x K]
             team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_10, team_player['indices'], axis=1)        
+
+            team_player_marg_11 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-player table, marginalized over both [1 x 1 x units]
+            team_player_vals_11 = tf.tensordot(team_player_marg_11, params['theta_team_player_11'], axes=1) #[1 x 1 x K]
             team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_11, team_player['indices'], axis=None)
-            team_player_vals = self.broadcast_add_marginal(team_player_vals, team_match_vals_10, team_player['indices'], axis=1)
-            team_player_vals = self.broadcast_add_marginal(team_player_vals, team_match_vals_11, team_player['indices'], axis=None)
+            
+            team_match_marg_10 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-match table, marginalized over matches [N_teams x 1 x units]
+            team_player_vals_inter_0 = tf.tensordot(team_match_marg_10, params['theta_team_player_inter_0'], axes=1) #[N_teams x 1 x K]
+            team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_inter_0, team_player['indices'], axis=1)
+
+            team_match_marg_11 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-match table, marginalized over both [1 x 1 x units]
+            team_player_vals_inter_1 = tf.tensordot(team_match_marg_11, params['theta_team_player_inter_1'], axes=1) #[1 x 1 x K]
+            team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_inter_1, team_player['indices'], axis=None)
 
 
-            team_match_vals = tf.reshape(tf.matmul(tf.reshape(team_match['values'], shape=[-1,units_in]), params['theta_010']), [-1])
+
+
+            team_match_vals = tf.reshape(tf.matmul(tf.reshape(team_match['values'], shape=[-1,units_in]), params['theta_team_match_00']), [-1])
+            
+            team_match_marg_01 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=0, keep_dims=True) # team-match table, marginalized over teams [1 x N_matches x units]       
+            team_match_vals_01 = tf.tensordot(team_match_marg_01, params['theta_team_match_01'], axes=1) #[1 x 1 x K]
             team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_01, team_match['indices'], axis=0)
-            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_10, team_match['indices'], axis=1)
-            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_11, team_match['indices'], axis=None)
-            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_player_vals_10, team_match['indices'], axis=1)
-            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_player_vals_11, team_match['indices'], axis=None)
 
+            team_match_marg_10 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-match table, marginalized over matches [N_teams x 1 x units]
+            team_match_vals_10 = tf.tensordot(team_match_marg_10, params['theta_team_match_10'], axes=1) #[N_teams x 1 x K]
+            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_10, team_match['indices'], axis=1)
+
+            team_match_marg_11 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-match table, marginalized over both [1 x 1 x units]
+            team_match_vals_11 = tf.tensordot(team_match_marg_11, params['theta_team_match_11'], axes=1) #[1 x 1 x K]
+            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_11, team_match['indices'], axis=None)
+
+            team_player_marg_10 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-match table, marginalized over matches [N_teams x 1 x units]
+            team_match_vals_inter_0 = tf.tensordot(team_player_marg_10, params['theta_team_match_inter_0'], axes=1) #[N_teams x 1 x K]
+            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_inter_0, team_match['indices'], axis=1)
+
+            team_player_marg_11 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-match table, marginalized over both [1 x 1 x units]
+            team_match_vals_inter_1 = tf.tensordot(team_player_marg_11, params['theta_team_match_inter_1'], axes=1) #[1 x 1 x K]
+            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_inter_1, team_match['indices'], axis=None)
+            
 
             if self.activation is not None:
                 team_player_vals = self.activation(team_player_vals)

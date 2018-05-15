@@ -9,6 +9,7 @@ class Model:
         pool_mode = kwargs.get('pool_mode', None)
         dropout_rate = kwargs.get('dropout_rate', None)
         layers = kwargs['layers']
+        regularization_rate = kwargs['regularization_rate']
         self.num_layers = len(layers)
         self.layers = {}
         units_in = 1
@@ -17,8 +18,14 @@ class Model:
             name = 'layer_' + str(l)
             units_out = layer['units']
             activation = layer.get('activation', None)
-            skip_connections = layer.get('skip_connections', False)
-            self.layers[name] = layer['type'](units=[units_in, units_out], pool_mode=pool_mode, dropout_rate=dropout_rate, activation=activation, skip_connections=skip_connections, scope=name)
+            skip_connections = layer.get('skip_connections', False)            
+            self.layers[name] = layer['type'](units=[units_in, units_out], 
+                                              pool_mode=pool_mode, 
+                                              dropout_rate=dropout_rate, 
+                                              regularization_rate=regularization_rate, 
+                                              activation=activation, 
+                                              skip_connections=skip_connections, 
+                                              scope=name)
             units_in = units_out
 
 
