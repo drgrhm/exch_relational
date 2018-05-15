@@ -160,7 +160,7 @@ class Table:
                     elif val < 0:
                         new_vals.append([0,0,1])
                     elif val == 0:
-                        new_vals.append([0,1,0])
+                        new_vals.append([0,1,0])                
             else:
                 new_vals = np.array([[val,0,0] for val in values])
 

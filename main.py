@@ -124,8 +124,6 @@ def one_hot_prediction_accuracy(values, values_out, noise_mask, num_features):
     return np.sum(preds*vals) / num_vals
 
 
-
-
 def make_uniform_noise_mask(noise_rate, num_vals):
     """A 0/1 noise mask. 0's correspond to dropped out values."""
     n0 = int(noise_rate * num_vals)
@@ -204,6 +202,7 @@ def main(opts, restore_point=None):
         # rec_loss_vl = table_ordinal_hinge_loss(team_match_values, team_match_out_vl['values'], team_match_noise_mask, opts['model_opts']['units_out'])
         # rec_loss_vl = table_prediction_rmse_loss(team_match_values, team_match_out_vl['values'], team_match_noise_mask, opts['model_opts']['units_out'])
         # rec_loss_vl = misprediction_loss(team_match_values, team_match_out_vl['values'], team_match_noise_mask, opts['model_opts']['units_out'])
+
 
         train_step = tf.train.AdamOptimizer(opts['learning_rate']).minimize(total_loss_tr)
         # train_step = tf.train.GradientDescentOptimizer(opts['learning_rate']).minimize(total_loss_tr)
@@ -358,8 +357,8 @@ if __name__ == "__main__":
 
     activation = tf.nn.relu
     # activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
-    dropout_rate = 0.2
     regularization_rate = 0.00001
+    dropout_rate = 0.2
     skip_connections = True
 
     auto_restore = False
@@ -367,6 +366,7 @@ if __name__ == "__main__":
     
 
 
+<<<<<<< HEAD
     opts = {'epochs':500,
             'data_folder':'data',
             'data_set':data_set,
@@ -381,7 +381,7 @@ if __name__ == "__main__":
                           'units_out':units_out,
                           'layers':[{'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
                                     # {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
                                     # {'type':FeatureDropoutLayer, 'units_out':units},
                                     # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},                                      
                                     {'type':ExchangeableLayer, 'units_out':units_out,  'activation':None},
