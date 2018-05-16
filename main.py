@@ -19,37 +19,69 @@ def table_rmse_loss(values, values_out, noise_mask, num_features):
 
     non_noise = tf.reshape(tf.cast(1 - noise_mask, tf.float32), [-1, num_features])[:,0]
 
-
+    AA = values - values_out
     
-    return tf.sqrt( tf.reduce_sum((**2)*non_noise) / (tf.reduce_sum(non_noise) + 1e-10) )
+    return tf.sqrt( tf.reduce_sum((AA**2)*non_noise) / (tf.reduce_sum(non_noise) + 1e-10) )
 
 
-def table_prediction_accuracy(indices, values, values_out, shape, split):
+def table_prediction_accuracy(indices, values, values_out, shape, split, num_features, threshold):
     
-    # in_t = sparse_transpose(indices, values, shape, split)
-    # out_t = sparse_transpose(indices, values_out, shape, split)
-    # vals_in_t = in_t['values']
-    # vals_out_t = out_t['values']
-    # noise = 1 - in_t['split']
+    values = np.reshape(values, [-1, num_features])[:,0]
+    values_out = np.reshape(values_out, [-1, num_features])[:,0]
 
-    # vals_in_t = np.reshape(vals_in_t[noise == 0], [-1,2])
 
-    # preds_in = np.sign(vals_in_t[:,0] - vals_in_t[:,1])
-    # num_vals = preds_in.shape[0]
+    in_t = sparse_transpose(indices, values, shape, split)
+    out_t = sparse_transpose(indices, values_out, shape, split)
+    vals_in_t = in_t['values']
+    vals_out_t = out_t['values']
+    noise = 1 - in_t['split']
 
-    # vals_out_t = np.reshape(vals_out_t[noise == 0], [-1,2])
-    # preds_out = np.sign(vals_out_t[:,0] - vals_out_t[:,1])
+    vals_in_t = np.reshape(vals_in_t[noise == 0], [-1,2])
+
+    preds_in = np.sign(np.round(vals_in_t[:,0] - vals_in_t[:,1], threshold))
+    num_vals = preds_in.shape[0]
+
+    vals_out_t = np.reshape(vals_out_t[noise == 0], [-1,2])
+    preds_out = np.sign(np.round(vals_out_t[:,0] - vals_out_t[:,1], threshold))
 
     # # preds_out = (np.abs(vals_out[:,0]) + np.abs(vals_out[:,1]) ) / 2
     # # preds_out = np.sign(np.round(np.sign(vals_out[:,0]) * preds_out, decimals=1)) ## TODO better way 
 
-    # # print("")
-    # # print('vals_in:  ', preds_in[0:20].astype(np.float32))
-    # # print('vals_out: ', preds_out[0:20])
+    print("")
+    print('vals_in_t:  ', preds_in[0:20].astype(np.float32))
+    print('vals_out_t: ', preds_out[0:20])
 
-    # return np.sum(preds_in == preds_out) / num_vals
+    return np.sum(preds_in == preds_out) / num_vals
 
-    return 0
+    # return 0
+
+
+
+# def table_prediction_accuracy(values, values_out, noise_mask, num_features):
+
+#     print()
+
+#     vals = np.reshape(values, [-1, num_features])[noise_mask == 0]
+#     vals_out = np.reshape(values_out, [-1, num_features])[noise_mask == 0]
+
+#     num_vals = vals.shape[0]
+    
+#     probs_out = np.exp(vals_out - np.max(vals_out, axis=1)[:,None])
+#     probs_out = probs_out / np.sum(probs_out, axis=1)[:,None]
+    
+#     preds = np.zeros_like(vals)
+#     max_inds = np.argmax(vals_out, axis=1)
+    
+#     preds[np.arange(num_vals), max_inds] = 1
+
+#     # print(vals[20:40])
+#     # print('')
+#     # print(preds[20:40])
+
+#     print('input:  ', np.mean(vals, axis=0))
+#     print('output: ', np.mean(preds, axis=0))
+
+#     return np.sum(preds*vals) / num_vals
 
 
 
@@ -223,7 +255,13 @@ def main(opts, restore_point=None):
             _, loss_tr, team_match_vals_out_tr, = sess.run([train_step, total_loss_tr, team_match_out_tr['values']], feed_dict=tr_dict)
             losses_tr.append(loss_tr)
               
-            pred_accuracy_tr = table_prediction_accuracy(data.team_match.indices_tr, data.team_match.values_tr, team_match_vals_out_tr, data.team_match.shape, team_match_noise)
+            pred_accuracy_tr = table_prediction_accuracy(data.team_match.indices_tr, 
+                                                         data.team_match.values_tr, 
+                                                         team_match_vals_out_tr, 
+                                                         data.team_match.shape, 
+                                                         team_match_noise, 
+                                                         opts['model_opts']['units_out'],
+                                                         opts['draw_threshold'])
             accuracies_tr.append(pred_accuracy_tr)
 
             if pred_accuracy_tr > accuracy_tr_best:
@@ -257,11 +295,18 @@ def main(opts, restore_point=None):
 
             mean_tr = data.team_match.mean_tr
             non_noise = 1 - team_match_noise
-            loss_vl_mean = np.sqrt( np.sum(((data.team_match.values_tr_vl - mean_tr)**2)*non_noise) / np.sum(non_noise) )
+            values_in = np.reshape(data.team_match.values_tr_vl, [-1, opts['model_opts']['units_in']])[:,0]
+            loss_vl_mean = np.sqrt( np.sum(((values_in - mean_tr)**2)*non_noise) / np.sum(non_noise) )
             losses_vl_mean.append(loss_vl_mean)
 
             split = data.team_match.split
-            pred_accuracy_vl = table_prediction_accuracy(data.team_match.indices_tr_vl, data.team_match.values_tr_vl, team_match_vals_out_vl, data.team_match.shape, split[split < 2])
+            pred_accuracy_vl = table_prediction_accuracy(data.team_match.indices_tr_vl, 
+                                                         data.team_match.values_tr_vl, 
+                                                         team_match_vals_out_vl, 
+                                                         data.team_match.shape, 
+                                                         split[split < 2], 
+                                                         opts['model_opts']['units_out'], 
+                                                         opts['draw_threshold'])
             accuracies_vl.append(pred_accuracy_vl)
 
 
@@ -310,6 +355,8 @@ if __name__ == "__main__":
 
 
     units = 128
+    units_in = 2
+    units_out = units_in
     # activation = tf.nn.tanh
     activation = tf.nn.relu
     # activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
@@ -320,21 +367,23 @@ if __name__ == "__main__":
     skip_connections = True
 
 
+
     opts = {'epochs':500,
             'data_split':[.8, .2, .0], # train, validation, test split
             'noise_rate':dropout_rate, # match vl/tr or ts/(tr+vl) ?            
             'learning_rate':.005,
+            'draw_threshold':1, 
             'model_opts':{'pool_mode':'mean',
                           'dropout_rate':dropout_rate,
                           'regularization_rate':regularization_rate,
-                          'units_in':2,
-                          'units_out':2,
+                          'units_in':units_in,
+                          'units_out':units_out,
                           'layers':[{'type':ExchangeableLayer, 'units':units, 'activation':activation},
                                     # {'type':FeatureDropoutLayer, 'units':units},
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},
                                     # {'type':FeatureDropoutLayer, 'units':units},
                                     {'type':ExchangeableLayer, 'units':units, 'activation':activation, 'skip_connections':skip_connections},               
-                                    {'type':ExchangeableLayer, 'units':1,  'activation':None},
+                                    {'type':ExchangeableLayer, 'units':units_out,  'activation':None},
                                    ],
                          },
             'verbosity':2,
