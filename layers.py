@@ -162,7 +162,6 @@ class ExchangeableLayer(Layer):
                 params[t]['theta_x0'] = tf.get_variable(name=(t + '_theta_x0'), shape=[units_in, units_out])
                 params[t]['theta_x1'] = tf.get_variable(name=(t + '_theta_x1'), shape=[units_in, units_out])
 
-
                 vals = tf.reshape(tf.matmul(tf.reshape(tables[t]['values'], [-1, units_in]),  params[t]['theta_00']), [-1])
 
                 marg_01 = self.marginalize_table(tables[t], pool_mode=self.pool_mode, axis=0, keep_dims=True)
@@ -178,6 +177,9 @@ class ExchangeableLayer(Layer):
                 vals = self.broadcast_add_marginal(vals, vals_11, tables[t]['indices'], axis=None)
 
                 
+                print(t, table)
+
+
 
 
                 if self.activation is not None:

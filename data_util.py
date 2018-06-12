@@ -16,6 +16,9 @@ class DataLoader:
         self.split_rates = split_rates
         self.verbosity = opts.get('verbosity', 0)
         self.resplit_data = opts.get('verbosity', True)
+
+        self.entites = {'user':0, 'business':1, 'category':2}
+        
         self.tables = self._load_tables()
 
     def _load_tables(self):
@@ -76,120 +79,14 @@ class DataLoader:
             category['split'] = self._get_split(category['indices'].shape[0])
             print(".... finished ....\n")
 
-            table_review = Table(0, review, predict=True)
-            table_friend = Table(1, friend)
-            table_category = Table(2, category)
+            table_review = Table(0, review, ['user', 'business'], predict=True)
+            table_friend = Table(1, friend, ['user', 'user'])
+            table_category = Table(2, category, ['business', 'category'])
 
             print(".... data loaded:", table_review.num_obs, "reviews,", table_friend.num_obs, "friends,", table_category.num_obs, "categories ....\n")
 
-
-            # table_review.print_top(40)
-            # table_friend.print_top(40)
-            # table_category.print_top(40)
-
-
-            return {'table_0':table_review, 'table_1':table_friend, 'table_2':table_category}
-
-
-
-        # if self.data_set == 'yelp_recruit':
-
-        #     if self.split_rates[2] != 0.:
-        #         print("***** using pre-defined test set. ignoring split_rates[2] *****")    
-
-        #     business_fields = ['business_id', 'categories', 'latitude', 'longitude', 'name', 'review_count', 'stars']
-        #     businesses, business_ids = self._get_entities(business_fields, 'business_id', 'yelp_training_set_business.json', 'yelp_test_set_business.json')
-
-        #     user_fields = ['average_stars', 'name', 'review_count', 'user_id', 'votes']
-        #     users, user_ids = self._get_entities(user_fields, 'user_id', 'yelp_training_set_user.json', 'yelp_test_set_user.json')
-
-        #     review_fields = ['business_id', 'review_id', 'stars', 'user_id', 'votes']
-        #     reviews, review_ids = self._get_entities(review_fields, 'review_id', 'yelp_training_set_review.json', 'yelp_test_set_review.json')
-
-        #     n_businesses = len(business_ids)
-        #     n_users = len(user_ids)
-
-        #     for review in reviews:
-        #         if review['business_id'] not in business_ids:
-        #             business_ids[review['business_id']] = n_businesses
-        #             n_businesses += 1
-        #         review['business_id'] = business_ids[review['business_id']]
-
-        #         if review['user_id'] not in user_ids:
-        #             user_ids[review['user_id']] = n_users
-        #             n_users += 1
-        #         review['user_id'] = user_ids[review['user_id']]
-                    
-                    
-
-        #     pprint(reviews[11])
-        #     print("")
-        #     pprint(reviews[5])
-        #     print("")
-        #     pprint(reviews[25])
-
-            # for review in reviews: 
-            #     print(review['review_id'])
-            #     if review['votes'] is None:
-            #         print(review['review_id'])
-            #         break
-
-
-        # elif self.data_set == 'yelp':
-
-            # e_user = Entity(0, 'user', {'uid'})
-            # e_business = Entity(1, 'business', {'bid'})
-            # e_rating = Entity(2, 'rating', {'rid'})
-
-            # r_ubr = Relation(0, 'ubr', [0,1,2], {'stars'})
-            # r_ur = Relation(1, 'ur', [0,2], {'useful'})
-            # r_uu = Relation(2, 'uu', [0,0], {'friends'})      
-
-
-            # business = pd.read_csv(os.path.join(self.data_folder, self.data_set, "yelp_business.csv"))
-
-
-            # user_ids = {}
-            # review_ids = {}
-            # business_ids = {}
-            
-
-    #         users, user_ids = self._load_from_json('user.json', 'user_id')
-    #         businesses, business_ids = self._load_from_json('business.json', 'business_id')
-    #         reviews, review_ids = self._load_from_json('review.json', 'review_id')
-
-
-    #         category_ids = {}
-    #         cat_id = 0
-    #         for busines in businesses:
-    #             for category in busines['categories']:
-    #                 if category not in category_ids:
-    #                     category_ids[category] = cat_id
-    #                     cat_id += 1
-
-
-    #         n_users = users.shape[0]
-    #         n_businesses = businesses.shape[0]
-    #         n_reviews = reviews.shape[0]
-
-    #         ratings_indices = []
-    #         ratings_values = []
-
-
-    #         for review in reviews:
-    #             uid = review['user_id']
-    #             bid = review['business_id']
-    #             rid = review['review_id']
-    #             inds = [user_ids[uid], business_ids[bid], review_ids[rid]]
-    #             ratings_indices.append(inds)
-    #             ratings_values = review['stars']
-
-            
-
-
-
-    #     return None
-
+            # return {'table_0':table_review, 'table_1':table_friend, 'table_2':table_category}
+            return {'table_0':table_review}
 
 
 
@@ -297,124 +194,8 @@ class DataLoader:
         return table.sample(frac=1.).reset_index(drop=True)
 
 
-    # def _get_entities(self, fields, id_name, path_tr_vl, path_ts, save_ids=False):
-
-    #     enitites_tr_vl = self._load_from_json(path_tr_vl, fields, 0)
-    #     enitites_ts = self._load_from_json(path_ts, fields, 2)
-
-    #     n_bus_tr_vl = len(enitites_tr_vl)
-    #     n_bus_tr = int(self.split_rates[0] * n_bus_tr_vl)
-    #     n_bus_vl = n_bus_tr_vl - n_bus_tr
-    #     n_bus_ts = len(enitites_ts)
-    #     # n_bus = n_bus_tr_vl + n_bus_ts
-
-    #     for i in range(n_bus_vl):
-    #         enitites_tr_vl[i]['split'] = 1    # split the tr and vl data
-
-    #     enitites = enitites_tr_vl + enitites_ts
-    #     random.shuffle(enitites)
-
-    #     entity_ids = {}
-    #     my_id = 0
-    #     for enitity in enitites:                
-    #         if enitity[id_name] not in entity_ids:
-    #             entity_ids[enitity[id_name]] = my_id
-    #             my_id += 1
-    #         enitity[id_name] = entity_ids[enitity[id_name]]  # assign unique row/col indices as ids
-
-    #     return enitites, entity_ids
-
-
-
-
-
-    # def _load_from_json(self, file_name, fields, split):
-    #     records = []
-    #     path = os.path.join(self.data_folder, self.data_set, file_name)
-
-    #     with open(path, 'r') as file:
-    #         if self.verbosity > 0:
-    #             print("... loading", file_name, "...")
-            
-    #         line = file.readline()
-    #         while line:
-    #             record = json.loads(line)
-                
-    #             if fields is not None:
-    #                 new_record = {}
-    #                 for field in fields:
-    #                     if field in record:
-    #                         new_record[field] = record[field]
-    #                     else: 
-    #                         new_record[field] = None
-    #                 new_record['split'] = split
-    #                 records.append(new_record)
-    #             else:
-    #                 record['split'] = split
-    #                 records.append(record)
-
-    #             line = file.readline()
-
-    #         if self.verbosity > 0:
-    #             print("...", len(records), "records loaded from", file_name, "...\n")
-
-    #     return records
-
-
-    # def _load_from_json(self, file_name, id_dict, id_name, my_id=0):
-    #     records = []
-    #     path = os.path.join(self.data_folder, self.data_set, file_name)
-
-    #     ## ....
-    #     init = my_id
-
-    #     with open(path, 'r') as file:
-    #         if self.verbosity > 0:
-    #             print("... loading", file_name, "...")
-            
-    #         line = file.readline()
-    #         while line:
-    #             record = json.loads(line)
-    #             records.append(record)
-
-    #             if record[id_name] not in id_dict:
-    #                 id_dict[record[id_name]] = my_id
-    #                 my_id += 1
-
-    #             line = file.readline()
-
-    #             ## ....
-    #             if my_id >= init + 10:
-    #                 break
-    #             ## ....
-
-    #         records = np.array(records)
-    #         if self.verbosity > 0:
-    #             print("...", records.shape[0], "records loaded from", file_name, "...\n")
-
-    #     return records, id_dict
-
-
-
-# class Entity:
-#     def __init__(self, eid, ename, attributes):
-#         self.eid = eid
-#         self.ename = ename
-#         self.attributes = attributes
-
-
-# class Relation:
-#     def __init__(self, rid, rname, eids, attributes):
-#         self.rid = rid
-#         self.rname = rname
-#         self.eids = eids
-#         self.attributes = attributes
-
-
-
-
 class Table:
-    def __init__(self, tid, data, num_features=1, predict=False):
+    def __init__(self, tid, data, entites, num_features=1, predict=False):
         self.tid = tid
         self.name = 'table_' + str(tid)
         self.indices = data['indices']

@@ -71,26 +71,22 @@ def main(opts, restore_point=None):
             placeholders[table.name] = {'values_clean':vals_clean, 'noise_mask':noise_mask}
 
         tables_out_tr = model.get_output(tables_pl)
-
-        # tables_out_vl = model.get_output(tables_pl, reuse=True, is_training=False)
-
+        tables_out_vl = model.get_output(tables_pl, reuse=True, is_training=False)
 
         ## Predictions made on table 0 only
-        rmse_loss_tr = table_rmse_loss(placeholders['table_0']['values_clean'], tables_out_tr['table_0']['values'], placeholders['table_0']['noise_mask'])        
-        # rmse_loss_tr = table_rmse_loss(one_hot_inv(placeholders['table_0']['values_clean'], 5), one_hot_inv(tables_out_tr['table_0']['values'], 5), placeholders['table_0']['noise_mask'])        
-        # rec_loss_vl = table_rmse_loss(placeholders['table_0']['values_clean'], tables_out_vl['table_0']['values'], placeholders['table_0']['noise_mask'])
-
-        mean = np.mean(data.tables['table_0'].values[data.tables['table_0'].split == 0])    # mean training value
-        mean = mean * tf.ones_like(tables_out_tr['table_0']['values'])
-        rmse_loss_mean_tr = table_rmse_loss(placeholders['table_0']['values_clean'], mean, placeholders['table_0']['noise_mask'])        
+        rmse_loss_tr = table_rmse_loss(placeholders['table_0']['values_clean'], tables_out_tr['table_0']['values'], placeholders['table_0']['noise_mask'])                
+        rmse_loss_vl = table_rmse_loss(placeholders['table_0']['values_clean'], tables_out_vl['table_0']['values'], placeholders['table_0']['noise_mask'])
 
         # ce_loss_tr = table_ce_loss(placeholders['table_0']['values_clean'], tables_out_tr['table_0']['values'], placeholders['table_0']['noise_mask'], 5)
 
-
         total_loss_tr = rmse_loss_tr
-        train_step = tf.train.AdamOptimizer(opts['learning_rate']).minimize(total_loss_tr)
 
-        
+        mean = np.mean(data.tables['table_0'].values[data.tables['table_0'].split == 0])    # mean training value
+        mean = mean * tf.ones_like(tables_out_vl['table_0']['values'])
+        rmse_loss_mean = table_rmse_loss(placeholders['table_0']['values_clean'], mean, placeholders['table_0']['noise_mask'])        
+
+
+        train_step = tf.train.AdamOptimizer(opts['learning_rate']).minimize(total_loss_tr)
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
         sess.run(tf.global_variables_initializer())
         
@@ -102,8 +98,11 @@ def main(opts, restore_point=None):
 
         losses_tr = []
         losses_vl = []
-        losses_vl_mean = []
-        losses_vl_buss = []
+        losses_mean = []
+        losses_buss = []
+
+        loss_tr_best = 5.0
+        loss_tr_best_ep = 0
 
         loss_vl_best = 5.0
         loss_vl_best_ep = 0
@@ -138,41 +137,22 @@ def main(opts, restore_point=None):
                 tr_dict[placeholders[table.name]['values_clean']] = vals_clean  # clean values 
 
 
-            _, loss_tr, out_tr = sess.run([train_step, total_loss_tr, tables_out_tr['table_0']['values']], feed_dict=tr_dict)
+            _, loss_tr = sess.run([train_step, total_loss_tr], feed_dict=tr_dict)
             losses_tr.append(loss_tr)
-            
 
-
-            
-
-            print(data.tables['table_0'].values[data.tables['table_0'].split == 0][0:10])
-            # print(data.tables['table_0'].values[0:10])
-            print(out_tr[0:10])
-
-            
-            print("epoch {:5d}. train loss: {:5.5f}".format(ep, loss_tr))
-
+            if loss_tr < loss_tr_best:
+                loss_tr_best = loss_tr
+                loss_tr_best_ep = ep
+                   
 
             vl_dict = {}
             for _, table in data.tables.items():
-            #     if table.predict:                    
-            #         inds = table.indices[table.split < 2] # training and validation entries
-            #         vals_clean = table.values[table.split < 2]
-            #         mask = table.split[table.split < 2]
-            #         vals_noisy = np.copy(vals_clean)
-            #         vals_noisy[mask == 1] = noise_value
-
-            #         vl_dict[tables_pl[table.name]['indices']] = inds
-            #         vl_dict[tables_pl[table.name]['values']] = vals_noisy   # noisy values 
-            #         vl_dict[placeholders[table.name]['noise_mask']] = mask
-            #         vl_dict[placeholders[table.name]['values_clean']] = vals_clean  # clean values 
-
-            #     else:
-            #         vl_dict[tables_pl[table.name]['indices']] = table.indices
-            #         vl_dict[tables_pl[table.name]['values']] = np.copy(table.values)   # noisy values 
-            #         vl_dict[placeholders[table.name]['noise_mask']] = np.zeros_like(table.values)
-            #         vl_dict[placeholders[table.name]['values_clean']] = table.values  # clean values 
-
+                if table.predict:                    
+                    inds = table.indices[table.split < 2] # training and validation entries
+                    vals_clean = table.values[table.split < 2]
+                    mask = table.split[table.split < 2]
+                    vals_noisy = np.copy(vals_clean)
+                    vals_noisy[mask == 1] = noise_value
                 else: 
                     inds = table.indices
                     vals_clean = table.values
@@ -185,31 +165,33 @@ def main(opts, restore_point=None):
                 vl_dict[placeholders[table.name]['noise_mask']] = mask
                 vl_dict[placeholders[table.name]['values_clean']] = vals_clean  # clean values 
 
-            # loss_vl, = sess.run([rec_loss_vl], feed_dict=vl_dict)
-            # losses_vl.append(loss_vl)
+            loss_vl, loss_mean, out_vl = sess.run([rmse_loss_vl, rmse_loss_mean, tables_out_vl['table_0']['values']], feed_dict=vl_dict)
+            losses_vl.append(loss_vl)
+            losses_mean.append(loss_mean)            
+
+            if loss_vl < loss_vl_best:
+                loss_vl_best = loss_vl
+                loss_vl_best_ep = ep
 
 
-            # if loss_vl < loss_vl_best:
-            #     loss_vl_best = loss_vl
-            #     loss_vl_best_ep = ep
-
-            # print("epoch {:5d}. train loss: {:5.5f} \t val loss: {:5.5f} \t best val loss: {:5.5f} at epoch {:5d}".format(ep, loss_tr, loss_vl, loss_vl_best, loss_vl_best_ep))
+            print(data.tables['table_0'].values[data.tables['table_0'].split == 1][0:15])
+            print(out_vl[0:15])
 
 
+            print("epoch {:5d}. train loss: {:5.5f}, val loss: {:5.5f} \t best train loss: {:5.5f} at epoch {:5d}, best val loss: {:5.5f} at epoch {:5d}".format(ep, loss_tr, loss_vl, loss_tr_best, loss_tr_best_ep, loss_vl_best, loss_vl_best_ep))
             
 
-
-        # show_last = opts['epochs']
-        # plt.title('RMSE Loss')
-        # # plt.plot(range(opts['epochs'])[-show_last:], losses_vl_baseline[-show_last:], '.-', color='red')
-        # plt.plot(range(opts['epochs'])[-show_last:], losses_tr[-show_last:], '.-', color='blue')
-        # plt.plot(range(opts['epochs'])[-show_last:], losses_vl[-show_last:], '.-', color='green')
-        # plt.xlabel('epoch')
-        # plt.ylabel('RMSE')
-        # plt.legend(('training', 'validation'))
-        # # plt.show()
-        # plt.savefig("rmse.pdf", bbox_inches='tight')
-        # plt.clf()
+        show_last = opts['epochs']
+        plt.title('RMSE Loss')
+        plt.plot(range(opts['epochs'])[-show_last:], losses_mean[-show_last:], '.-', color='red')
+        plt.plot(range(opts['epochs'])[-show_last:], losses_tr[-show_last:], '.-', color='blue')
+        plt.plot(range(opts['epochs'])[-show_last:], losses_vl[-show_last:], '.-', color='green')
+        plt.xlabel('epoch')
+        plt.ylabel('RMSE')
+        plt.legend(('mean', 'training', 'validation'))
+        # plt.show()
+        plt.savefig("rmse.pdf", bbox_inches='tight')
+        plt.clf()
 
 
 
@@ -227,7 +209,7 @@ if __name__ == "__main__":
     skip_connections = False
     units_in = 1
 
-    opts = {'epochs':1000,
+    opts = {'epochs':1,
             'learning_rate':.0001,
             'data_folder':'data',
             'data_set':data_set,
@@ -239,14 +221,14 @@ if __name__ == "__main__":
                           'units_in':units_in,
                           # 'units_out':units_out,
                           'layers':[
-                                    {'type':ExchangeableLayer, 'units_out':16, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':ExchangeableLayer, 'units_out':1, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':ExchangeableLayer, 'units_out':4, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':ExchangeableLayer, 'units_out':4, 'activation':activation, 'skip_connections':skip_connections},
                                     {'type':ExchangeableLayer, 'units_out':units_in, 'activation':None, 'skip_connections':skip_connections}
                                     ],
                          },
             'verbosity':2,    
             'restore_point_epoch':-1, # To continue counting epochs after loading saved model
-            'debug':True,
+            'debug':False,
             'seed':12345,
             }
 
