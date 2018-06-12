@@ -17,14 +17,21 @@ def expand_indices(indices, num_features):
     inds = np.concatenate((inds, inds_exp), axis=1)
     return inds
 
-# def sparse_transpose(indices, values, shape, split):
-#     trans = np.concatenate((indices, values[:,None], split[:,None]), axis=1)
-#     trans[:,[0,1,2,3]] = trans[:,[1,0,2,3]]
-#     trans = list(trans)
-#     trans.sort(key=lambda row: row[0])
-#     trans = np.array(trans)    
-#     inds = trans[:,0:2]
-#     vals = trans[:,2]
-#     split = trans[:,3]
-#     shape[[0,1]] = shape[[1,0]]
-#     return {'indices':inds, 'values':vals, 'shape':shape, 'split':split}
+def sparse_transpose(indices, values, shape, split, num_features):
+    vals = np.reshape(values, [-1,num_features])
+    trans = np.concatenate((indices, vals, split[:,None]), axis=1)
+    inds = np.arange(num_features + 3)
+    inds_t = np.copy(inds)
+    inds_t[[1,0]] = inds_t[[0,1]]
+    trans[:,inds] = trans[:,inds_t]
+    trans = list(trans)
+    trans.sort(key=lambda row: row[0])
+    trans = np.array(trans)
+    inds = trans[:,0:2].astype(np.int32)
+    vals = trans[:,2:(num_features+2)]
+    vals = np.reshape(vals, [-1])
+    split = trans[:,(num_features+2)]
+    shp = shape[[1,0]]
+    return {'indices':inds, 'values':vals, 'shape':shp, 'split':split}
+
+
