@@ -5,6 +5,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
 import glob
+from tqdm import tqdm 
 from copy import deepcopy
 from util import *
 from data_util import DataLoader, Table
@@ -16,11 +17,7 @@ from pprint import pprint
 ## Noise mask has 1's corresponding to values to be predicted
 def table_rmse_loss(values, values_out, noise_mask):
     return tf.sqrt( tf.reduce_sum(((values - values_out)**2)*noise_mask) / (tf.reduce_sum(noise_mask) + 1e-10) )
-    # return tf.sqrt( tf.reduce_sum(((values - values_out)**2)) / tf.cast(tf.shape(values)[0], tf.float32) ) 
-
-
-    
-
+    # return tf.reduce_sum(((values - values_out)**2)*noise_mask)
 
 
 def table_ce_loss(values, values_out, mask_split, dim):
@@ -43,12 +40,30 @@ def table_ce_loss(values, values_out, mask_split, dim):
 #     return tf.cast(tf.argmax(tf.reshape(x, [-1,d]), axis=1) + 1, tf.float32)
 
 
+def sample_uniform(tables, sample_rate, max_split_val):
+    # num_vals = mask_indices.shape[0]
+    # minibatch_size = np.minimum(minibatch_size, num_vals)
+    # for n in range(iters_per_epoch):
+    #     sample = np.random.choice(num_vals, size=minibatch_size, replace=False)
+    #     yield sample
+
+    num_samples = np.ceil(1 / sample_rate).astype(np.int32)
+    for i in range(num_samples):
+        out = {}
+        for t, table in tables.items():
+            num_obs = np.sum(table.split <= max_split_val)
+            sample_size = int(sample_rate * num_obs)
+            out[t] = np.random.choice(num_obs, sample_size, replace=False)
+        yield out
+
+
+
+
 def main(opts, restore_point=None):
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
 
     if opts['debug']:
         np.random.seed(opts['seed'])
-        # random.seed(opts['seed'])
 
     data = DataLoader(opts['data_folder'], opts['data_set'], opts['split_rates'], verbosity=opts['verbosity'])
 
@@ -67,7 +82,7 @@ def main(opts, restore_point=None):
             vals_noisy = tf.placeholder(tf.float32, shape=(None), name=(table.name + '_values_noisy'))
             noise_mask = tf.placeholder(tf.float32, shape=(None), name=(table.name + '_noise_mask'))
             
-            tables_pl[table.name] = {'indices':inds, 'values':vals_noisy, 'shape':table.shape}
+            tables_pl[table.name] = {'indices':inds, 'values':vals_noisy, 'shape':table.shape, 'entities':table.entities}
             placeholders[table.name] = {'values_clean':vals_clean, 'noise_mask':noise_mask}
 
         tables_out_tr = model.get_output(tables_pl)
@@ -81,13 +96,14 @@ def main(opts, restore_point=None):
 
         total_loss_tr = rmse_loss_tr
 
-        mean = np.mean(data.tables['table_0'].values[data.tables['table_0'].split == 0])    # mean training value
-        mean = mean * tf.ones_like(tables_out_vl['table_0']['values'])
-        rmse_loss_mean = table_rmse_loss(placeholders['table_0']['values_clean'], mean, placeholders['table_0']['noise_mask'])        
+        mean_tr = np.mean(data.tables['table_0'].values[data.tables['table_0'].split == 0])    # mean training value
+        mean_vals = mean_tr * tf.ones_like(tables_out_vl['table_0']['values'])
+        rmse_loss_mean = table_rmse_loss(placeholders['table_0']['values_clean'], mean_vals, placeholders['table_0']['noise_mask'])        
 
 
         train_step = tf.train.AdamOptimizer(opts['learning_rate']).minimize(total_loss_tr)
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+        # sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, device_count = {'GPU': 0}))
         sess.run(tf.global_variables_initializer())
         
 
@@ -101,19 +117,24 @@ def main(opts, restore_point=None):
         losses_mean = []
         losses_buss = []
 
-        loss_tr_best = 5.0
+        loss_tr_best = np.inf
         loss_tr_best_ep = 0
 
-        loss_vl_best = 5.0
+        loss_vl_best = np.inf
         loss_vl_best_ep = 0
 
+        sample_rate = opts['sample_rate']
 
         for ep in range(opts['restore_point_epoch'] + 1, opts['restore_point_epoch'] + opts['epochs'] + 1):
             print('------- epoch:', ep, '-------')
 
+            loss_tr, loss_vl, loss_mean = 0., 0., 0.            
+            table_0_count = {'tr':0, 'vl':0, 'ts':0}
 
+            # for tables_sample_tr in tqdm(sample_uniform(data.tables, sample_rate, 0), total=np.ceil(1 / sample_rate).astype(np.int32)):
             tr_dict = {}
-            for _, table in data.tables.items():
+            for t, table in data.tables.items():
+
                 if table.predict:
                     inds = table.indices[table.split == 0] # training entries only
                     vals_clean = table.values[table.split == 0]
@@ -123,30 +144,48 @@ def main(opts, restore_point=None):
                     mask = np.concatenate((np.zeros(n_clean), np.ones(n_noisy)))
                     np.random.shuffle(mask)
                     vals_noisy = np.copy(vals_clean)
-                    vals_noisy[mask == 1] = noise_value
+                    vals_noisy[mask == 1] = noise_value                        
                 else:
                     inds = table.indices    # not predicting, so all entries 
                     vals_clean = table.values
                     vals_noisy = np.copy(vals_clean)
                     mask = np.zeros_like(vals_clean)
-            
+
+                # inds = inds[tables_sample_tr[t]]
+                # vals_noisy = vals_noisy[tables_sample_tr[t]]
+                # mask = mask[tables_sample_tr[t]]
+                # vals_clean = vals_clean[tables_sample_tr[t]]
 
                 tr_dict[tables_pl[table.name]['indices']] = inds
                 tr_dict[tables_pl[table.name]['values']] = vals_noisy   # noisy values 
                 tr_dict[placeholders[table.name]['noise_mask']] = mask
                 tr_dict[placeholders[table.name]['values_clean']] = vals_clean  # clean values 
 
+                # if t == 'table_0':
+                #     table_0_count['tr'] += np.sum(mask)
 
-            _, loss_tr = sess.run([train_step, total_loss_tr], feed_dict=tr_dict)
+
+            _, bloss_tr = sess.run([train_step, total_loss_tr], feed_dict=tr_dict)
+            loss_tr += bloss_tr
+
+            # loss_tr = np.sqrt( loss_tr / table_0_count['tr'] )
             losses_tr.append(loss_tr)
-
             if loss_tr < loss_tr_best:
                 loss_tr_best = loss_tr
                 loss_tr_best_ep = ep
-                   
 
+
+
+            preds_val = mean_tr * np.ones(data.tables['table_0'].num_obs)
+
+            preds_val_count = np.zeros(data.tables['table_0'].num_obs)
+            num_entries_val = data.tables['table_0'].num_obs_vl
+
+            # while np.sum(preds_val_count) < opts['sampling_threshold'] * num_entries_val:
+
+                # for tables_sample_vl in tqdm(sample_uniform(data.tables, sample_rate, 1), total=np.ceil(1 / sample_rate).astype(np.int32)):
             vl_dict = {}
-            for _, table in data.tables.items():
+            for t, table in data.tables.items():
                 if table.predict:                    
                     inds = table.indices[table.split < 2] # training and validation entries
                     vals_clean = table.values[table.split < 2]
@@ -159,23 +198,50 @@ def main(opts, restore_point=None):
                     mask = np.zeros_like(table.values)
                     vals_noisy = np.copy(vals_clean)
 
+                # inds = inds[tables_sample_vl[t]]
+                # vals_noisy = vals_noisy[tables_sample_vl[t]]
+                # mask = mask[tables_sample_vl[t]]
+                # vals_clean = vals_clean[tables_sample_vl[t]]
 
                 vl_dict[tables_pl[table.name]['indices']] = inds
                 vl_dict[tables_pl[table.name]['values']] = vals_noisy   # noisy values 
                 vl_dict[placeholders[table.name]['noise_mask']] = mask
                 vl_dict[placeholders[table.name]['values_clean']] = vals_clean  # clean values 
 
-            loss_vl, loss_mean, out_vl = sess.run([rmse_loss_vl, rmse_loss_mean, tables_out_vl['table_0']['values']], feed_dict=vl_dict)
+                # if t == 'table_0':
+                #     table_0_count['vl'] += np.sum(mask)
+                        
+
+            bloss_vl, bloss_mean, bout_vl = sess.run([rmse_loss_vl, rmse_loss_mean, tables_out_vl['table_0']['values']], feed_dict=vl_dict)
+            loss_vl += bloss_vl
+            loss_mean += bloss_mean
+                
+                # preds_val[tables_sample_vl['table_0']] = bout_vl[mask_split_ == 1.]
+                # preds_val_count[sample_val_] = 1 
+
+                # split_ = data.tables['table_0'].split
+                # split_out_ = split_[split_ < 2]
+
+                # preds_val[split_ == 1] = bout_vl[split_out_ == 1]
+                # preds_val_count[split_] = 1 
+
+
+            
+            # loss_vl = np.sqrt( loss_vl / table_0_count['vl'] )
+            # loss_mean = np.sqrt(loss_mean)
+
+
+            print(data.tables['table_0'].values[data.tables['table_0'].split == 1][0:15])
+            print(bout_vl[0:15])
+
+
             losses_vl.append(loss_vl)
-            losses_mean.append(loss_mean)            
+            losses_mean.append(loss_mean)
+
 
             if loss_vl < loss_vl_best:
                 loss_vl_best = loss_vl
                 loss_vl_best_ep = ep
-
-
-            print(data.tables['table_0'].values[data.tables['table_0'].split == 1][0:15])
-            print(out_vl[0:15])
 
 
             print("epoch {:5d}. train loss: {:5.5f}, val loss: {:5.5f} \t best train loss: {:5.5f} at epoch {:5d}, best val loss: {:5.5f} at epoch {:5d}".format(ep, loss_tr, loss_vl, loss_tr_best, loss_tr_best_ep, loss_vl_best, loss_vl_best_ep))
@@ -209,26 +275,28 @@ if __name__ == "__main__":
     skip_connections = False
     units_in = 1
 
-    opts = {'epochs':1,
+    opts = {'epochs':3000,
             'learning_rate':.0001,
+            'sample_rate':.2,
+            'sampling_threshold':.90,
             'data_folder':'data',
             'data_set':data_set,
             'split_rates':[.8, .2, .0], # train, validation, test split
-            'noise_rate':dropout_rate,            
+            'noise_rate':dropout_rate,
             'model_opts':{'pool_mode':'mean',
                           'dropout_rate':dropout_rate,
                           'regularization_rate':regularization_rate,
                           'units_in':units_in,
                           # 'units_out':units_out,
                           'layers':[
-                                    {'type':ExchangeableLayer, 'units_out':4, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':ExchangeableLayer, 'units_out':4, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':ExchangeableLayer, 'units_out':1, 'activation':activation, 'skip_connections':skip_connections},
+                                    # {'type':ExchangeableLayer, 'units_out':2, 'activation':activation, 'skip_connections':skip_connections},
                                     {'type':ExchangeableLayer, 'units_out':units_in, 'activation':None, 'skip_connections':skip_connections}
                                     ],
                          },
             'verbosity':2,    
             'restore_point_epoch':-1, # To continue counting epochs after loading saved model
-            'debug':False,
+            'debug':True,
             'seed':12345,
             }
 

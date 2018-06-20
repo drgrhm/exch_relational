@@ -79,14 +79,14 @@ class DataLoader:
             category['split'] = self._get_split(category['indices'].shape[0])
             print(".... finished ....\n")
 
-            table_review = Table(0, review, ['user', 'business'], predict=True)
-            table_friend = Table(1, friend, ['user', 'user'])
-            table_category = Table(2, category, ['business', 'category'])
+            table_review = Table(0, review, [0, 1], predict=True)   # user x business
+            table_friend = Table(1, friend, [0, 0])     # user x user
+            table_category = Table(2, category, [1, 2])     # business x category 
 
             print(".... data loaded:", table_review.num_obs, "reviews,", table_friend.num_obs, "friends,", table_category.num_obs, "categories ....\n")
 
-            # return {'table_0':table_review, 'table_1':table_friend, 'table_2':table_category}
-            return {'table_0':table_review}
+            return {'table_0':table_review, 'table_1':table_friend, 'table_2':table_category}
+            # return {'table_0':table_review}
 
 
 
@@ -195,16 +195,20 @@ class DataLoader:
 
 
 class Table:
-    def __init__(self, tid, data, entites, num_features=1, predict=False):
+    def __init__(self, tid, data, entities, num_features=1, predict=False):
         self.tid = tid
         self.name = 'table_' + str(tid)
         self.indices = data['indices']
         self.values = data['values']
         self.shape = data['shape']
         self.split = data['split']
+        self.entities = entities
         self.num_values = self.values.shape[0]
         self.num_features = num_features
         self.num_obs = int(self.num_values / self.num_features)
+        self.num_obs_tr = np.sum(self.split == 0)
+        self.num_obs_vl = np.sum(self.split == 1)
+        self.num_obs_ts = np.sum(self.split == 2)
         self.predict = predict
 
 

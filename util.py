@@ -35,3 +35,44 @@ def sparse_transpose(indices, values, shape, split, num_features):
     return {'indices':inds, 'values':vals, 'shape':shp, 'split':split}
 
 
+# def powerset(my_set):
+#     return _powerset(my_set, {frozenset()})
+
+
+# def _powerset(my_set, pset):
+#     if len(my_set) == 0:
+#         return pset
+
+#     elem = my_set.pop()
+#     pset_new = pset.copy()
+
+#     for s in pset:
+#         ss = set(s.copy())
+#         ss.add(elem)
+#         ss = frozenset(ss)
+#         pset_new.add(ss)
+
+#     return _powerset(my_set, pset_new)
+
+
+def powerset(my_set, pset={frozenset()}):
+    if len(my_set) == 0:
+        return pset
+    elem = my_set.pop()
+    pset_new = pset.copy()  
+
+    for s in pset:
+        ss = set(s.copy())
+        ss.add(elem)
+        ss = frozenset(ss)
+        pset_new.add(ss)
+
+    return powerset(my_set, pset_new)
+
+
+    
+
+    
+
+
+

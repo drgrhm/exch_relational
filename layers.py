@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+from util import *
 
 
 class Layer:
@@ -151,6 +152,10 @@ class ExchangeableLayer(Layer):
 
             tables_out = {}
             
+
+            marg_2_10 = self.marginalize_table(tables['table_2'], pool_mode=self.pool_mode, axis=0, keep_dims=True)
+            marg_2_11 = self.marginalize_table(tables['table_2'], pool_mode=self.pool_mode, axis=None, keep_dims=True)
+
             for t, table in tables.items():
                 params[t] = {}
 
@@ -159,25 +164,100 @@ class ExchangeableLayer(Layer):
                 params[t]['theta_10'] = tf.get_variable(name=(t + '_theta_10'), shape=[units_in, units_out])
                 params[t]['theta_11'] = tf.get_variable(name=(t + '_theta_11'), shape=[units_in, units_out])
 
-                params[t]['theta_x0'] = tf.get_variable(name=(t + '_theta_x0'), shape=[units_in, units_out])
-                params[t]['theta_x1'] = tf.get_variable(name=(t + '_theta_x1'), shape=[units_in, units_out])
+                # params[t]['theta_b'] = tf.get_variable(name=(t + '_theta_b'), shape=[units_out])
 
-                vals = tf.reshape(tf.matmul(tf.reshape(tables[t]['values'], [-1, units_in]),  params[t]['theta_00']), [-1])
+                vals = tf.reshape(tf.matmul(tf.reshape(table['values'], [-1, units_in]),  params[t]['theta_00']), [-1])
 
-                marg_01 = self.marginalize_table(tables[t], pool_mode=self.pool_mode, axis=0, keep_dims=True)
+                marg_01 = self.marginalize_table(table, pool_mode=self.pool_mode, axis=0, keep_dims=True)
                 vals_01 = tf.tensordot(marg_01, params[t]['theta_01'], axes=1)
-                vals = self.broadcast_add_marginal(vals, vals_01, tables[t]['indices'], axis=0)
+                vals = self.broadcast_add_marginal(vals, vals_01, table['indices'], axis=0)
 
-                marg_10 = self.marginalize_table(tables[t], pool_mode=self.pool_mode, axis=1, keep_dims=True)
+                marg_10 = self.marginalize_table(table, pool_mode=self.pool_mode, axis=1, keep_dims=True)
                 vals_10 = tf.tensordot(marg_10, params[t]['theta_10'], axes=1)
-                vals = self.broadcast_add_marginal(vals, vals_10, tables[t]['indices'], axis=1)
+                vals = self.broadcast_add_marginal(vals, vals_10, table['indices'], axis=1)
 
-                marg_11 = self.marginalize_table(tables[t], pool_mode=self.pool_mode, axis=None, keep_dims=True)
+                marg_11 = self.marginalize_table(table, pool_mode=self.pool_mode, axis=None, keep_dims=True)
                 vals_11 = tf.tensordot(marg_11, params[t]['theta_11'], axes=1)
-                vals = self.broadcast_add_marginal(vals, vals_11, tables[t]['indices'], axis=None)
+                vals = self.broadcast_add_marginal(vals, vals_11, table['indices'], axis=None)
 
+                ## BIAS: 
+                # print("##### ADD IN BIAS ######")
+                # vals = vals + params[t]['theta_b']
+
+
+
+                if t == 'table_0': # user-business
+                    params[t]['theta_1x0_01'] = tf.get_variable(name=(t + '_theta_1x0_01'), shape=[units_in, units_out])    # Interaction with table 1
+                    params[t]['theta_1x0_11'] = tf.get_variable(name=(t + '_theta_1x0_11'), shape=[units_in, units_out])
+
+                    marg_1x0_01 = self.marginalize_table(tables['table_1'], pool_mode=self.pool_mode, axis=1, keep_dims=True)
+                    vals_1x0_01 = tf.tensordot(marg_1x0_01, params[t]['theta_1x0_01'], axes=1)
+                    vals = self.broadcast_add_marginal(vals, vals_1x0_01, table['indices'], axis=1)
                 
-                print(t, table)
+                    marg_1x0_11 = self.marginalize_table(tables['table_1'], pool_mode=self.pool_mode, axis=None, keep_dims=True)
+                    vals_1x0_11 = tf.tensordot(marg_1x0_11, params[t]['theta_1x0_11'], axes=1)
+                    vals = self.broadcast_add_marginal(vals, vals_1x0_11, table['indices'], axis=None)
+
+
+                    params[t]['theta_2x0_10'] = tf.get_variable(name=(t + '_theta_2x0_10'), shape=[units_in, units_out])    # Interaction with table 2
+                    params[t]['theta_2x0_11'] = tf.get_variable(name=(t + '_theta_2x0_11'), shape=[units_in, units_out])
+
+                    # marg_2x0_10 = self.marginalize_table(tables['table_2'], pool_mode=self.pool_mode, axis=0, keep_dims=True)
+                    # vals_2x0_10 = tf.tensordot(marg_2x0_10, params[t]['theta_2x0_10'], axes=1)
+                    # vals = self.broadcast_add_marginal(vals, vals_2x0_10, table['indices'], axis=0)     
+
+                    vals_2x0_10 = tf.tensordot(marg_2_10, params[t]['theta_2x0_10'], axes=1)
+                    vals = self.broadcast_add_marginal(vals, vals_2x0_10, table['indices'], axis=0)     
+
+                    # marg_2x0_11 = self.marginalize_table(tables['table_2'], pool_mode=self.pool_mode, axis=None, keep_dims=True)
+                    # vals_2x0_11 = tf.tensordot(marg_2x0_11, params[t]['theta_2x0_11'], axes=1)
+                    # vals = self.broadcast_add_marginal(vals, vals_2x0_11, table['indices'], axis=None) 
+
+                    vals_2x0_11 = tf.tensordot(marg_2_11, params[t]['theta_2x0_11'], axes=1)
+                    vals = self.broadcast_add_marginal(vals, vals_2x0_11, table['indices'], axis=None)                    
+                                        
+
+                if t == 'table_1': # user-user
+                    params[t]['theta_0x1_01'] = tf.get_variable(name=(t + '_theta_0x1_01'), shape=[units_in, units_out])    # Interaction with table 0
+                    params[t]['theta_0x1_11'] = tf.get_variable(name=(t + '_theta_0x1_11'), shape=[units_in, units_out])
+
+                    marg_0x1_01 = self.marginalize_table(tables['table_0'], pool_mode=self.pool_mode, axis=1, keep_dims=True)
+                    vals_0x1_01 = tf.tensordot(marg_0x1_01, params[t]['theta_0x1_01'], axes=1)
+                    vals = self.broadcast_add_marginal(vals, vals_0x1_01, table['indices'], axis=1)
+
+                    marg_0x1_11 = self.marginalize_table(tables['table_0'], pool_mode=self.pool_mode, axis=None, keep_dims=True)
+                    vals_0x1_11 = tf.tensordot(marg_0x1_11, params[t]['theta_0x1_11'], axes=1)
+                    vals = self.broadcast_add_marginal(vals, vals_0x1_11, table['indices'], axis=None)
+
+
+                if t == 'table_2': # business-category 
+                    params[t]['theta_0x2_10'] = tf.get_variable(name=(t + '_theta_0x2_10'), shape=[units_in, units_out])    # Interaction with table 0
+                    params[t]['theta_0x2_11'] = tf.get_variable(name=(t + '_theta_0x2_11'), shape=[units_in, units_out])
+
+                    # marg_0x2_10 = self.marginalize_table(tables['table_0'], pool_mode=self.pool_mode, axis=0, keep_dims=True)
+                    # vals_0x2_10 = tf.tensordot(marg_0x2_10, params[t]['theta_0x2_10'], axes=1)
+                    # vals = self.broadcast_add_marginal(vals, vals_0x2_10, table['indices'], axis=0)
+
+                    vals_0x2_10 = tf.tensordot(marg_2_10, params[t]['theta_0x2_10'], axes=1)
+                    vals = self.broadcast_add_marginal(vals, vals_0x2_10, table['indices'], axis=0)
+
+                    # marg_0x2_11 = self.marginalize_table(tables['table_0'], pool_mode=self.pool_mode, axis=None, keep_dims=True)
+                    # vals_0x2_11 = tf.tensordot(marg_0x2_11, params[t]['theta_0x2_11'], axes=1)
+                    # vals = self.broadcast_add_marginal(vals, vals_0x2_11, table['indices'], axis=None)   
+
+                    vals_0x2_11 = tf.tensordot(marg_2_11, params[t]['theta_0x2_11'], axes=1)
+                    vals = self.broadcast_add_marginal(vals, vals_0x2_11, table['indices'], axis=None)   
+
+
+                # for t_other, table_other in tables.items():
+                #     if t_other != t:
+                #         entities = set(table['entities'])
+                #         entities_other = set(table_other['entities'])
+                #         entities_common = entities.intersection(entities_other)                        
+                #         dim_sets = powerset(entities_common)
+
+                #         for dim_set in dim_sets:
+
 
 
 
@@ -189,7 +269,7 @@ class ExchangeableLayer(Layer):
                     vals = vals + tables[t]['values']
 
 
-                tables_out[t] = {'indices':tables[t]['indices'], 'values':vals, 'shape':tables[t]['shape']}
+                tables_out[t] = {'indices':table['indices'], 'values':vals, 'shape':table['shape']}
                     
 
 
