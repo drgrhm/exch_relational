@@ -5,6 +5,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
 import glob
+import time
 from tqdm import tqdm 
 from copy import deepcopy
 from util import *
@@ -98,12 +99,12 @@ def main(opts, restore_point=None):
 
         mean_tr = np.mean(data.tables['table_0'].values[data.tables['table_0'].split == 0])    # mean training value
         mean_vals = mean_tr * tf.ones_like(tables_out_vl['table_0']['values'])
-        rmse_loss_mean = table_rmse_loss(placeholders['table_0']['values_clean'], mean_vals, placeholders['table_0']['noise_mask'])        
+        rmse_loss_mean = table_rmse_loss(placeholders['table_0']['values_clean'], mean_vals, placeholders['table_0']['noise_mask'])
 
 
         train_step = tf.train.AdamOptimizer(opts['learning_rate']).minimize(total_loss_tr)
-        sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-        # sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, device_count = {'GPU': 0}))
+        # sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+        sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, device_count = {'GPU': 0}))
         sess.run(tf.global_variables_initializer())
         
 
@@ -126,6 +127,7 @@ def main(opts, restore_point=None):
         sample_rate = opts['sample_rate']
 
         for ep in range(opts['restore_point_epoch'] + 1, opts['restore_point_epoch'] + opts['epochs'] + 1):
+            begin = time.time()            
             print('------- epoch:', ep, '-------')
 
             loss_tr, loss_vl, loss_mean = 0., 0., 0.            
@@ -243,8 +245,7 @@ def main(opts, restore_point=None):
                 loss_vl_best = loss_vl
                 loss_vl_best_ep = ep
 
-
-            print("epoch {:5d}. train loss: {:5.5f}, val loss: {:5.5f} \t best train loss: {:5.5f} at epoch {:5d}, best val loss: {:5.5f} at epoch {:5d}".format(ep, loss_tr, loss_vl, loss_tr_best, loss_tr_best_ep, loss_vl_best, loss_vl_best_ep))
+            print("epoch {:5d} took {:.1f}s. train loss: {:5.5f}, val loss: {:5.5f} \t best train loss: {:5.5f} at epoch {:5d}, best val loss: {:5.5f} at epoch {:5d}".format(ep, time.time() - begin, loss_tr, loss_vl, loss_tr_best, loss_tr_best_ep, loss_vl_best, loss_vl_best_ep))
             
 
         show_last = opts['epochs']
@@ -275,7 +276,7 @@ if __name__ == "__main__":
     skip_connections = False
     units_in = 1
 
-    opts = {'epochs':3000,
+    opts = {'epochs':3,
             'learning_rate':.0001,
             'sample_rate':.2,
             'sampling_threshold':.90,
@@ -289,7 +290,9 @@ if __name__ == "__main__":
                           'units_in':units_in,
                           # 'units_out':units_out,
                           'layers':[
-                                    {'type':ExchangeableLayer, 'units_out':1, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':ExchangeableLayer, 'units_out':4, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':ExchangeableLayer, 'units_out':4, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'dropout_rate':dropout_rate},
                                     # {'type':ExchangeableLayer, 'units_out':2, 'activation':activation, 'skip_connections':skip_connections},
                                     {'type':ExchangeableLayer, 'units_out':units_in, 'activation':None, 'skip_connections':skip_connections}
                                     ],

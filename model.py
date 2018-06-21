@@ -15,7 +15,9 @@ class Model:
 
         for l, layer in enumerate(layers):
             name = 'layer_' + str(l)
-            units_out = layer['units_out']
+
+            units_out = layer.get('units_out', units_in)
+            
             activation = layer.get('activation', None)
             skip_connections = layer.get('skip_connections', False)
             self.layers[name] = layer['type'](units=[units_in, units_out], 

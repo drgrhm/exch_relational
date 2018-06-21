@@ -38,6 +38,10 @@ class DataLoader:
                 review = data['review'].item()
                 friend = data['friend'].item()
                 category = data['category'].item()
+                n_users = review['shape'][0]
+                n_businesses = review['shape'][1]
+                # n_reviews = review['shape'][2]
+                n_categories = category['shape'][1]
                 print(".... finished ....\n")
 
             else:
@@ -51,7 +55,7 @@ class DataLoader:
                 
                 n_users = len(user_ids)
                 n_businesses = len(business_ids)
-                n_reviews = len(review_ids)
+                # n_reviews = len(review_ids)
                 n_categories = len(category_ids)
                 
                 review = {'indices':review_indices,
@@ -83,7 +87,8 @@ class DataLoader:
             table_friend = Table(1, friend, [0, 0])     # user x user
             table_category = Table(2, category, [1, 2])     # business x category 
 
-            print(".... data loaded:", table_review.num_obs, "reviews,", table_friend.num_obs, "friends,", table_category.num_obs, "categories ....\n")
+            print(".... data loaded:", n_users, "users,",  n_businesses, "businesses,",  n_categories, "categories")
+            print(".... ", table_review.num_obs, "review-relationships,", table_friend.num_obs, "friend-relationships,", table_category.num_obs, "categories-relationships ....\n")
 
             return {'table_0':table_review, 'table_1':table_friend, 'table_2':table_category}
             # return {'table_0':table_review}
@@ -99,8 +104,7 @@ class DataLoader:
         print(".... creating categories table ....")
         category_indices = []
         business_ids = {}
-        category_ids = {}
-        cid = 0
+        category_ids = {}        
         for _, business in businesses.iterrows():
             self._update_id_dict(business_ids, business['business_id'])
             for category in business['categories'].split(';'):

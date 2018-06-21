@@ -150,239 +150,142 @@ class ExchangeableLayer(Layer):
                                # regularizer=tf.contrib.keras.regularizers.l2(self.regularization_rate),
                                reuse=reuse):
 
+            params['table_0'] = {}
+            params['table_1'] = {}
+            params['table_2'] = {}
+
             tables_out = {}
+
+            marg_0_10 = self.marginalize_table(tables['table_0'], pool_mode=self.pool_mode, axis=0, keep_dims=True) # 1 x n_businesses x K
+            marg_0_01 = self.marginalize_table(tables['table_0'], pool_mode=self.pool_mode, axis=1, keep_dims=True) # n_users x 1 x K
+            marg_0_11 = self.marginalize_table(tables['table_0'], pool_mode=self.pool_mode, axis=None, keep_dims=True) # 1 x 1 x K
+
+            marg_1 = self.marginalize_table(tables['table_1'], pool_mode=self.pool_mode, axis=0, keep_dims=False)
+            marg_1_10 = tf.expand_dims(marg_1, axis=0)  # 1 x n_users x K
+            # marg_1_01 = tf.expand_dims(marg_1, axis=1)  # n_users x 1 x K
+            marg_1_11 = self.marginalize_table(tables['table_1'], pool_mode=self.pool_mode, axis=None, keep_dims=True) # 1 x 1 x K
+
+            marg_2_10 = self.marginalize_table(tables['table_2'], pool_mode=self.pool_mode, axis=0, keep_dims=True) # 1 x n_categories x K
+            marg_2_01 = self.marginalize_table(tables['table_2'], pool_mode=self.pool_mode, axis=1, keep_dims=True) # n_businesses x 1 x K
+            marg_2_11 = self.marginalize_table(tables['table_2'], pool_mode=self.pool_mode, axis=None, keep_dims=True) # 1 x 1 x K
+
+
+            params['theta_b'] = tf.get_variable(name=('theta_b'), shape=[units_out])
+
+
+            params['table_0']['theta_00'] = tf.get_variable(name=('table_0_theta_00'), shape=[units_in, units_out])            
+            params['table_0']['theta_10'] = tf.get_variable(name=('table_0_theta_10'), shape=[units_in, units_out])
+            params['table_0']['theta_01'] = tf.get_variable(name=('table_0_theta_01'), shape=[units_in, units_out])
+            params['table_0']['theta_11'] = tf.get_variable(name=('table_0_theta_11'), shape=[units_in, units_out])
+
+            params['table_0']['theta_1x0_10'] = tf.get_variable(name=('table_0_theta_1x0_10'), shape=[units_in, units_out])    # Interaction with table 1
+            params['table_0']['theta_1x0_11'] = tf.get_variable(name=('table_0_theta_1x0_11'), shape=[units_in, units_out])
             
+            params['table_0']['theta_2x0_01'] = tf.get_variable(name=('table_0_theta_2x0_01'), shape=[units_in, units_out])    # Interaction with table 2
+            params['table_0']['theta_2x0_11'] = tf.get_variable(name=('table_0_theta_2x0_11'), shape=[units_in, units_out])            
 
-            marg_2_10 = self.marginalize_table(tables['table_2'], pool_mode=self.pool_mode, axis=0, keep_dims=True)
-            marg_2_11 = self.marginalize_table(tables['table_2'], pool_mode=self.pool_mode, axis=None, keep_dims=True)
-
-            for t, table in tables.items():
-                params[t] = {}
-
-                params[t]['theta_00'] = tf.get_variable(name=(t + '_theta_00'), shape=[units_in, units_out])
-                params[t]['theta_01'] = tf.get_variable(name=(t + '_theta_01'), shape=[units_in, units_out])
-                params[t]['theta_10'] = tf.get_variable(name=(t + '_theta_10'), shape=[units_in, units_out])
-                params[t]['theta_11'] = tf.get_variable(name=(t + '_theta_11'), shape=[units_in, units_out])
-
-                # params[t]['theta_b'] = tf.get_variable(name=(t + '_theta_b'), shape=[units_out])
-
-                vals = tf.reshape(tf.matmul(tf.reshape(table['values'], [-1, units_in]),  params[t]['theta_00']), [-1])
-
-                marg_01 = self.marginalize_table(table, pool_mode=self.pool_mode, axis=0, keep_dims=True)
-                vals_01 = tf.tensordot(marg_01, params[t]['theta_01'], axes=1)
-                vals = self.broadcast_add_marginal(vals, vals_01, table['indices'], axis=0)
-
-                marg_10 = self.marginalize_table(table, pool_mode=self.pool_mode, axis=1, keep_dims=True)
-                vals_10 = tf.tensordot(marg_10, params[t]['theta_10'], axes=1)
-                vals = self.broadcast_add_marginal(vals, vals_10, table['indices'], axis=1)
-
-                marg_11 = self.marginalize_table(table, pool_mode=self.pool_mode, axis=None, keep_dims=True)
-                vals_11 = tf.tensordot(marg_11, params[t]['theta_11'], axes=1)
-                vals = self.broadcast_add_marginal(vals, vals_11, table['indices'], axis=None)
-
-                ## BIAS: 
-                # print("##### ADD IN BIAS ######")
-                # vals = vals + params[t]['theta_b']
-
-
-
-                if t == 'table_0': # user-business
-                    params[t]['theta_1x0_01'] = tf.get_variable(name=(t + '_theta_1x0_01'), shape=[units_in, units_out])    # Interaction with table 1
-                    params[t]['theta_1x0_11'] = tf.get_variable(name=(t + '_theta_1x0_11'), shape=[units_in, units_out])
-
-                    marg_1x0_01 = self.marginalize_table(tables['table_1'], pool_mode=self.pool_mode, axis=1, keep_dims=True)
-                    vals_1x0_01 = tf.tensordot(marg_1x0_01, params[t]['theta_1x0_01'], axes=1)
-                    vals = self.broadcast_add_marginal(vals, vals_1x0_01, table['indices'], axis=1)
-                
-                    marg_1x0_11 = self.marginalize_table(tables['table_1'], pool_mode=self.pool_mode, axis=None, keep_dims=True)
-                    vals_1x0_11 = tf.tensordot(marg_1x0_11, params[t]['theta_1x0_11'], axes=1)
-                    vals = self.broadcast_add_marginal(vals, vals_1x0_11, table['indices'], axis=None)
-
-
-                    params[t]['theta_2x0_10'] = tf.get_variable(name=(t + '_theta_2x0_10'), shape=[units_in, units_out])    # Interaction with table 2
-                    params[t]['theta_2x0_11'] = tf.get_variable(name=(t + '_theta_2x0_11'), shape=[units_in, units_out])
-
-                    # marg_2x0_10 = self.marginalize_table(tables['table_2'], pool_mode=self.pool_mode, axis=0, keep_dims=True)
-                    # vals_2x0_10 = tf.tensordot(marg_2x0_10, params[t]['theta_2x0_10'], axes=1)
-                    # vals = self.broadcast_add_marginal(vals, vals_2x0_10, table['indices'], axis=0)     
-
-                    vals_2x0_10 = tf.tensordot(marg_2_10, params[t]['theta_2x0_10'], axes=1)
-                    vals = self.broadcast_add_marginal(vals, vals_2x0_10, table['indices'], axis=0)     
-
-                    # marg_2x0_11 = self.marginalize_table(tables['table_2'], pool_mode=self.pool_mode, axis=None, keep_dims=True)
-                    # vals_2x0_11 = tf.tensordot(marg_2x0_11, params[t]['theta_2x0_11'], axes=1)
-                    # vals = self.broadcast_add_marginal(vals, vals_2x0_11, table['indices'], axis=None) 
-
-                    vals_2x0_11 = tf.tensordot(marg_2_11, params[t]['theta_2x0_11'], axes=1)
-                    vals = self.broadcast_add_marginal(vals, vals_2x0_11, table['indices'], axis=None)                    
-                                        
-
-                if t == 'table_1': # user-user
-                    params[t]['theta_0x1_01'] = tf.get_variable(name=(t + '_theta_0x1_01'), shape=[units_in, units_out])    # Interaction with table 0
-                    params[t]['theta_0x1_11'] = tf.get_variable(name=(t + '_theta_0x1_11'), shape=[units_in, units_out])
-
-                    marg_0x1_01 = self.marginalize_table(tables['table_0'], pool_mode=self.pool_mode, axis=1, keep_dims=True)
-                    vals_0x1_01 = tf.tensordot(marg_0x1_01, params[t]['theta_0x1_01'], axes=1)
-                    vals = self.broadcast_add_marginal(vals, vals_0x1_01, table['indices'], axis=1)
-
-                    marg_0x1_11 = self.marginalize_table(tables['table_0'], pool_mode=self.pool_mode, axis=None, keep_dims=True)
-                    vals_0x1_11 = tf.tensordot(marg_0x1_11, params[t]['theta_0x1_11'], axes=1)
-                    vals = self.broadcast_add_marginal(vals, vals_0x1_11, table['indices'], axis=None)
-
-
-                if t == 'table_2': # business-category 
-                    params[t]['theta_0x2_10'] = tf.get_variable(name=(t + '_theta_0x2_10'), shape=[units_in, units_out])    # Interaction with table 0
-                    params[t]['theta_0x2_11'] = tf.get_variable(name=(t + '_theta_0x2_11'), shape=[units_in, units_out])
-
-                    # marg_0x2_10 = self.marginalize_table(tables['table_0'], pool_mode=self.pool_mode, axis=0, keep_dims=True)
-                    # vals_0x2_10 = tf.tensordot(marg_0x2_10, params[t]['theta_0x2_10'], axes=1)
-                    # vals = self.broadcast_add_marginal(vals, vals_0x2_10, table['indices'], axis=0)
-
-                    vals_0x2_10 = tf.tensordot(marg_2_10, params[t]['theta_0x2_10'], axes=1)
-                    vals = self.broadcast_add_marginal(vals, vals_0x2_10, table['indices'], axis=0)
-
-                    # marg_0x2_11 = self.marginalize_table(tables['table_0'], pool_mode=self.pool_mode, axis=None, keep_dims=True)
-                    # vals_0x2_11 = tf.tensordot(marg_0x2_11, params[t]['theta_0x2_11'], axes=1)
-                    # vals = self.broadcast_add_marginal(vals, vals_0x2_11, table['indices'], axis=None)   
-
-                    vals_0x2_11 = tf.tensordot(marg_2_11, params[t]['theta_0x2_11'], axes=1)
-                    vals = self.broadcast_add_marginal(vals, vals_0x2_11, table['indices'], axis=None)   
-
-
-                # for t_other, table_other in tables.items():
-                #     if t_other != t:
-                #         entities = set(table['entities'])
-                #         entities_other = set(table_other['entities'])
-                #         entities_common = entities.intersection(entities_other)                        
-                #         dim_sets = powerset(entities_common)
-
-                #         for dim_set in dim_sets:
-
-
-
-
-
-                if self.activation is not None:
-                    vals = self.activation(vals)
-                    
-                if self.skip_connections and units_in == units_out:
-                    vals = vals + tables[t]['values']
-
-
-                tables_out[t] = {'indices':table['indices'], 'values':vals, 'shape':table['shape']}
-                    
-
-
-            # theta = tf.get_variable(name='thetaaa', shape=[units_in, units_out])
-            # params['thetaaa'] = theta
-
-            # # table_0_vals = tf.matmul(tf.reshape(tables['table_0']['values'], [-1, units_in]), theta)
-            # table_0_vals = tf.reshape(tables['table_0']['values'], [-1, units_in]) * theta
-            # table_0_vals = tf.reshape(table_0_vals, [-1])
-
-
-            # tables_out = {'table_0':{'indices':tables['table_0']['indices'], 'values':table_0_vals, 'shape':tables['table_0']['shape']},
-            #               'table_1':tables['table_1'],
-            #               'table_2':tables['table_2']
-            #               }
+            vals_0 = tf.reshape(tf.matmul(tf.reshape(tables['table_0']['values'], [-1, units_in]),  params['table_0']['theta_00']), [-1])
             
+            vals_0_10 = tf.tensordot(marg_0_10, params['table_0']['theta_10'], axes=1)
+            vals_0 = self.broadcast_add_marginal(vals_0, vals_0_10, tables['table_0']['indices'], axis=0)
 
+            vals_0_01 = tf.tensordot(marg_0_01, params['table_0']['theta_01'], axes=1)
+            vals_0 = self.broadcast_add_marginal(vals_0, vals_0_01, tables['table_0']['indices'], axis=1)
+
+            vals_0_11 = tf.tensordot(marg_0_11, params['table_0']['theta_11'], axes=1)
+            vals_0 = self.broadcast_add_marginal(vals_0, vals_0_11, tables['table_0']['indices'], axis=None)
+
+            vals_1x0_10 = tf.tensordot(marg_1_10, params['table_0']['theta_1x0_10'], axes=1)
+            vals_0 = self.broadcast_add_marginal(vals_0, vals_1x0_10, tables['table_0']['indices'], axis=0)
+
+            vals_1x0_11 = tf.tensordot(marg_1_11, params['table_0']['theta_1x0_11'], axes=1)
+            vals_0 = self.broadcast_add_marginal(vals_0, vals_1x0_11, tables['table_0']['indices'], axis=None)
+
+            vals_2x0_01 = tf.tensordot(marg_2_01, params['table_0']['theta_2x0_01'], axes=1)
+            vals_0 = self.broadcast_add_marginal(vals_0, vals_2x0_01, tables['table_0']['indices'], axis=0)     
+
+            vals_2x0_11 = tf.tensordot(marg_2_11, params['table_0']['theta_2x0_11'], axes=1)
+            vals_0 = self.broadcast_add_marginal(vals_0, vals_2x0_11, tables['table_0']['indices'], axis=None)     
+
+            vals_0 = tf.reshape(vals_0, [-1, units_out]) + params['theta_b']
+            vals_0 = tf.reshape(vals_0, [-1])
+
+
+
+            params['table_1']['theta_00'] = tf.get_variable(name=('table_1_theta_00'), shape=[units_in, units_out])
+            params['table_1']['theta_10'] = tf.get_variable(name=('table_1_theta_10'), shape=[units_in, units_out])
+            # params['table_1']['theta_01'] = tf.get_variable(name=('table_1_theta_01'), shape=[units_in, units_out])
+            # params['table_1']['theta_01'] = params['table_1']['theta_10']
+            params['table_1']['theta_11'] = tf.get_variable(name=('table_1_theta_11'), shape=[units_in, units_out])            
+
+            params['table_1']['theta_0x1_01'] = tf.get_variable(name=('table_1_theta_0x1_01'), shape=[units_in, units_out])    # Interaction with table 0
+            params['table_1']['theta_0x1_11'] = tf.get_variable(name=('table_1_theta_0x1_11'), shape=[units_in, units_out])
+
+            vals_1 = tf.reshape(tf.matmul(tf.reshape(tables['table_1']['values'], [-1, units_in]),  params['table_1']['theta_00']), [-1])
+
+            vals_1_10 = tf.tensordot(marg_1_10, params['table_1']['theta_10'], axes=1)
+            vals_1 = self.broadcast_add_marginal(vals_1, vals_1_10, tables['table_1']['indices'], axis=0)
+
+            vals_1_11 = tf.tensordot(marg_1_11, params['table_1']['theta_11'], axes=1)
+            vals_1 = self.broadcast_add_marginal(vals_1, vals_1_11, tables['table_1']['indices'], axis=None)
+
+            vals_0x1_01 = tf.tensordot(marg_0_01, params['table_1']['theta_0x1_01'], axes=1)
+            vals_1 = self.broadcast_add_marginal(vals_1, vals_0x1_01, tables['table_1']['indices'], axis=1)
+
+            vals_0x1_11 = tf.tensordot(marg_0_11, params['table_1']['theta_0x1_11'], axes=1)
+            vals_1 = self.broadcast_add_marginal(vals_1, vals_0x1_11, tables['table_1']['indices'], axis=None)
+
+            vals_1 = tf.reshape(vals_1, [-1, units_out]) + params['theta_b']
+            vals_1 = tf.reshape(vals_1, [-1])
+
+
+            params['table_2']['theta_00'] = tf.get_variable(name=('table_2_theta_00'), shape=[units_in, units_out])            
+            params['table_2']['theta_10'] = tf.get_variable(name=('table_2_theta_10'), shape=[units_in, units_out])
+            params['table_2']['theta_01'] = tf.get_variable(name=('table_2_theta_01'), shape=[units_in, units_out])
+            params['table_2']['theta_11'] = tf.get_variable(name=('table_2_theta_11'), shape=[units_in, units_out])
+
+            params['table_2']['theta_0x2_10'] = tf.get_variable(name=('table_2_theta_0x2_10'), shape=[units_in, units_out])    # Interaction with table 0
+            params['table_2']['theta_0x2_11'] = tf.get_variable(name=('table_2_theta_0x2_11'), shape=[units_in, units_out])            
+
+            vals_2 = tf.reshape(tf.matmul(tf.reshape(tables['table_2']['values'], [-1, units_in]),  params['table_2']['theta_00']), [-1])
+            
+            vals_2_10 = tf.tensordot(marg_2_10, params['table_2']['theta_10'], axes=1)
+            vals_2 = self.broadcast_add_marginal(vals_2, vals_2_10, tables['table_2']['indices'], axis=0)
+
+            vals_2_01 = tf.tensordot(marg_2_01, params['table_2']['theta_01'], axes=1)
+            vals_2 = self.broadcast_add_marginal(vals_2, vals_2_01, tables['table_2']['indices'], axis=1)
+
+            vals_2_11 = tf.tensordot(marg_2_11, params['table_2']['theta_11'], axes=1)
+            vals_2 = self.broadcast_add_marginal(vals_2, vals_2_11, tables['table_2']['indices'], axis=None)
+
+
+            vals_0x2_10 = tf.tensordot(marg_0_10, params['table_2']['theta_0x2_10'], axes=1)
+            vals_2 = self.broadcast_add_marginal(vals_2, vals_0x2_10, tables['table_2']['indices'], axis=0)
+
+            vals_0x2_11 = tf.tensordot(marg_0_11, params['table_2']['theta_0x2_11'], axes=1)
+            vals_2 = self.broadcast_add_marginal(vals_2, vals_0x2_11, tables['table_2']['indices'], axis=None)
+
+            vals_2 = tf.reshape(vals_2, [-1,units_out]) + params['theta_b']
+            vals_2 = tf.reshape(vals_2, [-1])
+
+
+            if self.activation is not None:
+                vals_0 = self.activation(vals_0)
+                vals_1 = self.activation(vals_1)
+                vals_2 = self.activation(vals_2)
+                    
+            if self.skip_connections and units_in == units_out:
+                vals_0 = vals_0 + tables['table_0']['values']
+                vals_1 = vals_1 + tables['table_1']['values']
+                vals_2 = vals_2 + tables['table_2']['values']
+
+
+            tables_out['table_0'] = {'indices':tables['table_0']['indices'], 'values':vals_0, 'shape':tables['table_0']['shape']}
+            tables_out['table_1'] = {'indices':tables['table_1']['indices'], 'values':vals_1, 'shape':tables['table_1']['shape']}
+            tables_out['table_2'] = {'indices':tables['table_2']['indices'], 'values':vals_2, 'shape':tables['table_2']['shape']}
 
             return tables_out
-
-
-
-        # units_in = self.units_in
-        # units_out = self.units_out
-        # params = self.params
-
-        # with tf.variable_scope(self.scope, 
-        #                        initializer=tf.random_normal_initializer(0, .01),
-        #                        regularizer=tf.contrib.keras.regularizers.l2(self.regularization_rate),
-        #                        reuse=reuse):
-
-        #     params['theta_team_player_00'] = tf.get_variable(name='theta_team_player_00', shape=[units_in, units_out])
-        #     params['theta_team_player_01'] = tf.get_variable(name='theta_team_player_01', shape=[units_in, units_out])
-        #     params['theta_team_player_10'] = tf.get_variable(name='theta_team_player_10', shape=[units_in, units_out])
-        #     params['theta_team_player_11'] = tf.get_variable(name='theta_team_player_11', shape=[units_in, units_out])
-
-        #     params['theta_team_player_inter_0'] = tf.get_variable(name='theta_team_player_inter_0', shape=[units_in, units_out])
-        #     params['theta_team_player_inter_1'] = tf.get_variable(name='theta_team_player_inter_1', shape=[units_in, units_out])
-
-
-        #     params['theta_team_match_00'] = tf.get_variable(name='theta_team_match_00', shape=[units_in, units_out])
-        #     params['theta_team_match_01'] = tf.get_variable(name='theta_team_match_01', shape=[units_in, units_out])
-        #     params['theta_team_match_10'] = tf.get_variable(name='theta_team_match_10', shape=[units_in, units_out])
-        #     params['theta_team_match_11'] = tf.get_variable(name='theta_team_match_11', shape=[units_in, units_out])            
-
-        #     params['theta_team_match_inter_0'] = tf.get_variable(name='theta_team_match_inter_0', shape=[units_in, units_out])
-        #     params['theta_team_match_inter_1'] = tf.get_variable(name='theta_team_match_inter_1', shape=[units_in, units_out])
-
-
-        #     team_player_vals = tf.reshape(tf.matmul(tf.reshape(team_player['values'], shape=[-1,units_in]), params['theta_team_player_00']), [-1])
-
-        #     team_player_marg_01 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=0, keep_dims=True) # team-player table, marginalized over teams [1 x N_players x units]       
-        #     team_player_vals_01 = tf.tensordot(team_player_marg_01, params['theta_team_player_01'], axes=1) #[1 x N_players x K]
-        #     team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_01, team_player['indices'], axis=0)
-
-        #     team_player_marg_10 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-player table, marginalized over players [N_teams x 1 x units]
-        #     team_player_vals_10 = tf.tensordot(team_player_marg_10, params['theta_team_player_10'], axes=1) #[N_teams x 1 x K]
-        #     team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_10, team_player['indices'], axis=1)        
-
-        #     team_player_marg_11 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-player table, marginalized over both [1 x 1 x units]
-        #     team_player_vals_11 = tf.tensordot(team_player_marg_11, params['theta_team_player_11'], axes=1) #[1 x 1 x K]
-        #     team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_11, team_player['indices'], axis=None)
-            
-        #     team_match_marg_10 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-match table, marginalized over matches [N_teams x 1 x units]
-        #     team_player_vals_inter_0 = tf.tensordot(team_match_marg_10, params['theta_team_player_inter_0'], axes=1) #[N_teams x 1 x K]
-        #     team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_inter_0, team_player['indices'], axis=1)
-
-        #     team_match_marg_11 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-match table, marginalized over both [1 x 1 x units]
-        #     team_player_vals_inter_1 = tf.tensordot(team_match_marg_11, params['theta_team_player_inter_1'], axes=1) #[1 x 1 x K]
-        #     team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_inter_1, team_player['indices'], axis=None)
-
-
-
-
-        #     team_match_vals = tf.reshape(tf.matmul(tf.reshape(team_match['values'], shape=[-1,units_in]), params['theta_team_match_00']), [-1])
-            
-        #     team_match_marg_01 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=0, keep_dims=True) # team-match table, marginalized over teams [1 x N_matches x units]       
-        #     team_match_vals_01 = tf.tensordot(team_match_marg_01, params['theta_team_match_01'], axes=1) #[1 x 1 x K]
-        #     team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_01, team_match['indices'], axis=0)
-
-        #     team_match_marg_10 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-match table, marginalized over matches [N_teams x 1 x units]
-        #     team_match_vals_10 = tf.tensordot(team_match_marg_10, params['theta_team_match_10'], axes=1) #[N_teams x 1 x K]
-        #     team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_10, team_match['indices'], axis=1)
-
-        #     team_match_marg_11 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-match table, marginalized over both [1 x 1 x units]
-        #     team_match_vals_11 = tf.tensordot(team_match_marg_11, params['theta_team_match_11'], axes=1) #[1 x 1 x K]
-        #     team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_11, team_match['indices'], axis=None)
-
-        #     team_player_marg_10 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-match table, marginalized over matches [N_teams x 1 x units]
-        #     team_match_vals_inter_0 = tf.tensordot(team_player_marg_10, params['theta_team_match_inter_0'], axes=1) #[N_teams x 1 x K]
-        #     team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_inter_0, team_match['indices'], axis=1)
-
-        #     team_player_marg_11 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-match table, marginalized over both [1 x 1 x units]
-        #     team_match_vals_inter_1 = tf.tensordot(team_player_marg_11, params['theta_team_match_inter_1'], axes=1) #[1 x 1 x K]
-        #     team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_inter_1, team_match['indices'], axis=None)
-            
-
-        #     if self.activation is not None:
-        #         team_player_vals = self.activation(team_player_vals)
-        #         team_match_vals = self.activation(team_match_vals)
-
-
-        #     if self.skip_connections and units_in == units_out:
-        #         team_player_vals = team_player_vals + team_player['values'],
-        #         team_match_vals = team_match_vals + team_match['values'],
-
-
-        #     team_player_out = {'indices':team_player['indices'], 'values':team_player_vals, 'shape':team_player['shape']}
-        #     team_match_out = {'indices':team_match['indices'], 'values':team_match_vals, 'shape':team_match['shape']}
-
-            
-        #     return team_player_out, team_match_out
-
+        
 
 
 class FeatureDropoutLayer(Layer):
@@ -393,25 +296,24 @@ class FeatureDropoutLayer(Layer):
         self.scope = kwargs['scope']
 
 
-    def get_output(self, team_player, team_match, reuse=None, is_training=True):
 
-        team_player_vals = tf.layers.dropout(tf.reshape(team_player['values'], [-1, self.units_in]), rate=self.dropout_rate, training=is_training)
-        team_player_vals = tf.reshape(team_player_vals, [-1])
+    def get_output(self, tables, reuse=None, is_training=True):
 
-        team_match_vals = tf.layers.dropout(tf.reshape(team_match['values'], [-1, self.units_in]), rate=self.dropout_rate, training=is_training)
-        team_match_vals = tf.reshape(team_match_vals, [-1])
+        vals = tf.reshape(tables['table_0']['values'], [-1, self.units_in])
+        vals = tf.layers.dropout(vals, rate=self.dropout_rate, training=is_training)
+        vals = tf.reshape(vals, [-1])
 
+        # for t, table in tables:           
+        #     vals = tf.reshape(table['values'], [-1, self.units_in])
+        #     vals = tf.layers.dropout(vals, rate=self.dropout_rate, training=is_training)
+        #     vals = tf.reshape(team_player_vals, [-1])
 
-        team_player_out = {'indices':team_player['indices'], 'values':team_player_vals, 'shape':team_player['shape']}
-        # team_player_out = team_player_out
-        team_match_out = {'indices':team_match['indices'], 'values':team_match_vals, 'shape':team_match['shape']}
-        
-        return team_player_out, team_match_out
+        tables_out = {}
+        tables_out['table_0'] = {'indices':tables['table_0']['indices'],'values':vals, 'shape':tables['table_0']['shape']}   
+        tables_out['table_1'] = tables['table_1']
+        tables_out['table_2'] = tables['table_2']
 
-    
-
-
-
+        return tables_out
 
 
 
