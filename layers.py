@@ -22,13 +22,13 @@ class Layer:
         if axis == 0:
             temp_inds = tf.strided_slice(inds, begin=[0,0], end=[num_vals,2], strides=[units_out,1])
             temp_inds = tf.slice(temp_inds, begin=[0,1], size=[-1,1])
-            new_vals = tf.cast(tf.gather_nd(tf.reshape(marginal, shape=[-1,units_out]), temp_inds), tf.float32)
+            new_vals = tf.cast(tf.gather_nd(tf.reshape(marginal, shape=[-1,units_out]), temp_inds), tf.float64)
             vals = tf.reshape(table_values, shape=[-1,units_out]) + new_vals
             vals = tf.reshape(vals, shape=[num_vals])
         elif axis == 1:
             temp_inds = tf.strided_slice(inds, begin=[0,0], end=[num_vals,2], strides=[units_out,1])
             temp_inds = tf.slice(temp_inds, begin=[0,0], size=[-1,1])
-            new_vals = tf.cast(tf.gather_nd(tf.reshape(marginal, shape=[-1,units_out]), temp_inds), tf.float32)
+            new_vals = tf.cast(tf.gather_nd(tf.reshape(marginal, shape=[-1,units_out]), temp_inds), tf.float64)
             vals = tf.reshape(table_values, shape=[-1,units_out]) + new_vals
             vals = tf.reshape(vals, shape=[num_vals])
         elif axis == None:
@@ -41,13 +41,13 @@ class Layer:
     def expand_tensor_indices(self, indices, units):
 
         num_vals = tf.shape(indices)[0]
-        inds_exp = tf.reshape(tf.tile(tf.range(units, dtype=tf.float32), multiples=[num_vals]), shape=[-1, 1]) # expand dimension of mask indices
-        indices = tf.cast(indices, dtype=tf.float32) # cast so computation can be done on gpu
+        inds_exp = tf.reshape(tf.tile(tf.range(units, dtype=tf.float64), multiples=[num_vals]), shape=[-1, 1]) # expand dimension of mask indices
+        indices = tf.cast(indices, dtype=tf.float64) # cast so computation can be done on gpu
         inds = tf.tile(indices, multiples=[units,1]) # duplicate indices units times
         inds = tf.reshape(inds, shape=[units, num_vals, 2])
         inds = tf.reshape(tf.transpose(inds, perm=[1,0,2]), shape=[-1,2])
         inds = tf.concat((inds, inds_exp), axis=1)
-        inds = tf.cast(inds, dtype=tf.int32)
+        inds = tf.cast(inds, dtype=tf.int64)
         return inds
 
 
@@ -105,20 +105,20 @@ class Layer:
         if axis == 0:
             inds = table['indices'][:,1]
             num_segments = table['shape'][1]
-            count = tf.unsorted_segment_sum(tf.ones_like(inds, dtype=tf.float32), inds, num_segments)
-            count = tf.cast(tf.expand_dims(count, axis=1), dtype=tf.float32)
+            count = tf.unsorted_segment_sum(tf.ones_like(inds, dtype=tf.float64), inds, num_segments)
+            count = tf.cast(tf.expand_dims(count, axis=1), dtype=tf.float64)
             if keep_dims:
                 count = tf.reshape(count, shape=[1,-1,1])
         elif axis == 1:
             inds = table['indices'][:,0]
             num_segments = table['shape'][0]
-            count = tf.unsorted_segment_sum(tf.ones_like(inds, dtype=tf.float32), inds, num_segments)
-            count = tf.cast(tf.expand_dims(count, axis=1), dtype=tf.float32)
+            count = tf.unsorted_segment_sum(tf.ones_like(inds, dtype=tf.float64), inds, num_segments)
+            count = tf.cast(tf.expand_dims(count, axis=1), dtype=tf.float64)
             if keep_dims:
                 count = tf.reshape(count, shape=[-1,1,1])
         elif axis is None:
             inds = table['indices']
-            count = tf.cast(tf.shape(inds)[0], dtype=tf.float32)
+            count = tf.cast(tf.shape(inds)[0], dtype=tf.float64)
             if keep_dims:
                 count = tf.reshape(count, shape=[1,1,1])            
         return count
@@ -170,19 +170,19 @@ class ExchangeableLayer(Layer):
             marg_2_11 = self.marginalize_table(tables['table_2'], pool_mode=self.pool_mode, axis=None, keep_dims=True) # 1 x 1 x K
 
 
-            params['theta_b'] = tf.get_variable(name=('theta_b'), shape=[units_out])
+            params['theta_b'] = tf.get_variable(name=('theta_b'), shape=[units_out], dtype=tf.float64)
 
 
-            params['table_0']['theta_00'] = tf.get_variable(name=('table_0_theta_00'), shape=[units_in, units_out])            
-            params['table_0']['theta_10'] = tf.get_variable(name=('table_0_theta_10'), shape=[units_in, units_out])
-            params['table_0']['theta_01'] = tf.get_variable(name=('table_0_theta_01'), shape=[units_in, units_out])
-            params['table_0']['theta_11'] = tf.get_variable(name=('table_0_theta_11'), shape=[units_in, units_out])
+            params['table_0']['theta_00'] = tf.get_variable(name=('table_0_theta_00'), shape=[units_in, units_out], dtype=tf.float64)            
+            params['table_0']['theta_10'] = tf.get_variable(name=('table_0_theta_10'), shape=[units_in, units_out], dtype=tf.float64)
+            params['table_0']['theta_01'] = tf.get_variable(name=('table_0_theta_01'), shape=[units_in, units_out], dtype=tf.float64)
+            params['table_0']['theta_11'] = tf.get_variable(name=('table_0_theta_11'), shape=[units_in, units_out], dtype=tf.float64)
 
-            params['table_0']['theta_1x0_10'] = tf.get_variable(name=('table_0_theta_1x0_10'), shape=[units_in, units_out])    # Interaction with table 1
-            params['table_0']['theta_1x0_11'] = tf.get_variable(name=('table_0_theta_1x0_11'), shape=[units_in, units_out])
+            params['table_0']['theta_1x0_10'] = tf.get_variable(name=('table_0_theta_1x0_10'), shape=[units_in, units_out], dtype=tf.float64)    # Interaction with table 1
+            params['table_0']['theta_1x0_11'] = tf.get_variable(name=('table_0_theta_1x0_11'), shape=[units_in, units_out], dtype=tf.float64)
             
-            params['table_0']['theta_2x0_01'] = tf.get_variable(name=('table_0_theta_2x0_01'), shape=[units_in, units_out])    # Interaction with table 2
-            params['table_0']['theta_2x0_11'] = tf.get_variable(name=('table_0_theta_2x0_11'), shape=[units_in, units_out])            
+            params['table_0']['theta_2x0_01'] = tf.get_variable(name=('table_0_theta_2x0_01'), shape=[units_in, units_out], dtype=tf.float64)    # Interaction with table 2
+            params['table_0']['theta_2x0_11'] = tf.get_variable(name=('table_0_theta_2x0_11'), shape=[units_in, units_out], dtype=tf.float64)            
 
             vals_0 = tf.reshape(tf.matmul(tf.reshape(tables['table_0']['values'], [-1, units_in]),  params['table_0']['theta_00']), [-1])
             
@@ -212,14 +212,14 @@ class ExchangeableLayer(Layer):
 
 
 
-            params['table_1']['theta_00'] = tf.get_variable(name=('table_1_theta_00'), shape=[units_in, units_out])
-            params['table_1']['theta_10'] = tf.get_variable(name=('table_1_theta_10'), shape=[units_in, units_out])
+            params['table_1']['theta_00'] = tf.get_variable(name=('table_1_theta_00'), shape=[units_in, units_out], dtype=tf.float64)
+            params['table_1']['theta_10'] = tf.get_variable(name=('table_1_theta_10'), shape=[units_in, units_out], dtype=tf.float64)
             # params['table_1']['theta_01'] = tf.get_variable(name=('table_1_theta_01'), shape=[units_in, units_out])
             # params['table_1']['theta_01'] = params['table_1']['theta_10']
-            params['table_1']['theta_11'] = tf.get_variable(name=('table_1_theta_11'), shape=[units_in, units_out])            
+            params['table_1']['theta_11'] = tf.get_variable(name=('table_1_theta_11'), shape=[units_in, units_out], dtype=tf.float64)            
 
-            params['table_1']['theta_0x1_01'] = tf.get_variable(name=('table_1_theta_0x1_01'), shape=[units_in, units_out])    # Interaction with table 0
-            params['table_1']['theta_0x1_11'] = tf.get_variable(name=('table_1_theta_0x1_11'), shape=[units_in, units_out])
+            params['table_1']['theta_0x1_01'] = tf.get_variable(name=('table_1_theta_0x1_01'), shape=[units_in, units_out], dtype=tf.float64)    # Interaction with table 0
+            params['table_1']['theta_0x1_11'] = tf.get_variable(name=('table_1_theta_0x1_11'), shape=[units_in, units_out], dtype=tf.float64)
 
             vals_1 = tf.reshape(tf.matmul(tf.reshape(tables['table_1']['values'], [-1, units_in]),  params['table_1']['theta_00']), [-1])
 
@@ -239,13 +239,13 @@ class ExchangeableLayer(Layer):
             vals_1 = tf.reshape(vals_1, [-1])
 
 
-            params['table_2']['theta_00'] = tf.get_variable(name=('table_2_theta_00'), shape=[units_in, units_out])            
-            params['table_2']['theta_10'] = tf.get_variable(name=('table_2_theta_10'), shape=[units_in, units_out])
-            params['table_2']['theta_01'] = tf.get_variable(name=('table_2_theta_01'), shape=[units_in, units_out])
-            params['table_2']['theta_11'] = tf.get_variable(name=('table_2_theta_11'), shape=[units_in, units_out])
+            params['table_2']['theta_00'] = tf.get_variable(name=('table_2_theta_00'), shape=[units_in, units_out], dtype=tf.float64)            
+            params['table_2']['theta_10'] = tf.get_variable(name=('table_2_theta_10'), shape=[units_in, units_out], dtype=tf.float64)
+            params['table_2']['theta_01'] = tf.get_variable(name=('table_2_theta_01'), shape=[units_in, units_out], dtype=tf.float64)
+            params['table_2']['theta_11'] = tf.get_variable(name=('table_2_theta_11'), shape=[units_in, units_out], dtype=tf.float64)
 
-            params['table_2']['theta_0x2_10'] = tf.get_variable(name=('table_2_theta_0x2_10'), shape=[units_in, units_out])    # Interaction with table 0
-            params['table_2']['theta_0x2_11'] = tf.get_variable(name=('table_2_theta_0x2_11'), shape=[units_in, units_out])            
+            params['table_2']['theta_0x2_10'] = tf.get_variable(name=('table_2_theta_0x2_10'), shape=[units_in, units_out], dtype=tf.float64)    # Interaction with table 0
+            params['table_2']['theta_0x2_11'] = tf.get_variable(name=('table_2_theta_0x2_11'), shape=[units_in, units_out], dtype=tf.float64)            
 
             vals_2 = tf.reshape(tf.matmul(tf.reshape(tables['table_2']['values'], [-1, units_in]),  params['table_2']['theta_00']), [-1])
             
@@ -257,7 +257,6 @@ class ExchangeableLayer(Layer):
 
             vals_2_11 = tf.tensordot(marg_2_11, params['table_2']['theta_11'], axes=1)
             vals_2 = self.broadcast_add_marginal(vals_2, vals_2_11, tables['table_2']['indices'], axis=None)
-
 
             vals_0x2_10 = tf.tensordot(marg_0_10, params['table_2']['theta_0x2_10'], axes=1)
             vals_2 = self.broadcast_add_marginal(vals_2, vals_0x2_10, tables['table_2']['indices'], axis=0)
@@ -294,7 +293,6 @@ class FeatureDropoutLayer(Layer):
         Layer.__init__(self, units)
         self.dropout_rate = kwargs['dropout_rate']
         self.scope = kwargs['scope']
-
 
 
     def get_output(self, tables, reuse=None, is_training=True):

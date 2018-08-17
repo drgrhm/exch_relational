@@ -33,7 +33,7 @@ class DataLoader:
 
             save_path = os.path.join(save_path, 'yelp_data.npz')
             if os.path.isfile(save_path):            
-                print(".... loading data from .npz file ....")
+                print(".... loading data from .npz file ....\n")
                 data = np.load(save_path)
                 review = data['review'].item()
                 friend = data['friend'].item()
@@ -42,7 +42,7 @@ class DataLoader:
                 n_businesses = review['shape'][1]
                 # n_reviews = review['shape'][2]
                 n_categories = category['shape'][1]
-                print(".... finished ....\n")
+                # print(".... finished ....\n")
 
             else:
                 businesses = self._load_csv("yelp_business.csv")
@@ -73,15 +73,15 @@ class DataLoader:
                         'friend':friend,
                         'category':category}
                 
-                print(".... saving data to .npz ....")
+                print(".... saving data to .npz ....\n")
                 np.savez_compressed(save_path, **data)
-                print(".... finished ....\n")
+                # print(".... finished ....\n")
 
-            print(".... splitting data into train/validation/test ....")
+            print(".... splitting data into train/validation/test ....\n")
             review['split'] = self._get_split(review['indices'].shape[0])
             friend['split'] = self._get_split(friend['indices'].shape[0])
             category['split'] = self._get_split(category['indices'].shape[0])
-            print(".... finished ....\n")
+            # print(".... finished ....\n")
 
             table_review = Table(0, review, [0, 1], predict=True)   # user x business
             table_friend = Table(1, friend, [0, 0])     # user x user

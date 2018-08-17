@@ -1,12 +1,12 @@
 import numpy as np
 import tensorflow as tf
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+# import matplotlib
+# matplotlib.use('Agg')
+# import matplotlib.pyplot as plt
 import os
 import glob
 import time
-from tqdm import tqdm 
+# from tqdm import tqdm 
 from copy import deepcopy
 from util import *
 from data_util import DataLoader, Table
@@ -48,7 +48,7 @@ def sample_uniform(tables, sample_rate, max_split_val):
     #     sample = np.random.choice(num_vals, size=minibatch_size, replace=False)
     #     yield sample
 
-    num_samples = np.ceil(1 / sample_rate).astype(np.int32)
+    num_samples = np.ceil(1 / sample_rate).astype(np.int64)
     for i in range(num_samples):
         out = {}
         for t, table in tables.items():
@@ -68,6 +68,9 @@ def main(opts, restore_point=None):
 
     data = DataLoader(opts['data_folder'], opts['data_set'], opts['split_rates'], verbosity=opts['verbosity'])
 
+    if not os.path.isdir(opts['ckpt_folder']):
+        os.makedirs(opts['ckpt_folder'])
+
     with tf.Graph().as_default():
 
         if opts['debug']:
@@ -79,9 +82,9 @@ def main(opts, restore_point=None):
         tables_pl = {}
         for t, table in data.tables.items():
             inds = tf.placeholder(tf.int32, shape=(None, 2), name=(table.name + '_indices'))
-            vals_clean = tf.placeholder(tf.float32, shape=(None), name=(table.name + '_values_clean'))
-            vals_noisy = tf.placeholder(tf.float32, shape=(None), name=(table.name + '_values_noisy'))
-            noise_mask = tf.placeholder(tf.float32, shape=(None), name=(table.name + '_noise_mask'))
+            vals_clean = tf.placeholder(tf.float64, shape=(None), name=(table.name + '_values_clean'))
+            vals_noisy = tf.placeholder(tf.float64, shape=(None), name=(table.name + '_values_noisy'))
+            noise_mask = tf.placeholder(tf.float64, shape=(None), name=(table.name + '_noise_mask'))
             
             tables_pl[table.name] = {'indices':inds, 'values':vals_noisy, 'shape':table.shape, 'entities':table.entities}
             placeholders[table.name] = {'values_clean':vals_clean, 'noise_mask':noise_mask}
@@ -97,10 +100,12 @@ def main(opts, restore_point=None):
 
         total_loss_tr = rmse_loss_tr
 
-        mean_tr = np.mean(data.tables['table_0'].values[data.tables['table_0'].split == 0])    # mean training value
-        mean_vals = mean_tr * tf.ones_like(tables_out_vl['table_0']['values'])
-        rmse_loss_mean = table_rmse_loss(placeholders['table_0']['values_clean'], mean_vals, placeholders['table_0']['noise_mask'])
-
+        table = data.tables['table_0']
+        mean_tr = np.mean(table.values[table.split == 0])    # mean training value
+        vals = table.values[table.split < 2]
+        mean_vals = mean_tr * np.ones_like(vals)
+        mask = table.split[table.split < 2]
+        rmse_loss_mean = np.sqrt( np.sum(((vals - mean_vals)**2)*mask) / (np.sum(mask) + 1e-10) )
 
         train_step = tf.train.AdamOptimizer(opts['learning_rate']).minimize(total_loss_tr)
         # sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
@@ -115,8 +120,9 @@ def main(opts, restore_point=None):
 
         losses_tr = []
         losses_vl = []
+        losses_ts = []
         losses_mean = []
-        losses_buss = []
+        # losses_buss = []        
 
         loss_tr_best = np.inf
         loss_tr_best_ep = 0
@@ -124,16 +130,29 @@ def main(opts, restore_point=None):
         loss_vl_best = np.inf
         loss_vl_best_ep = 0
 
+        loss_vl_last_save = np.inf
+
         sample_rate = opts['sample_rate']
+
+
+        saver = tf.train.Saver()
+        if restore_point is not None:
+            saver.restore(sess, restore_point)
+            losses_file = opts['ckpt_folder'] + "/losses.npz"
+            if os.path.isfile(losses_file):
+                losses = np.load(losses_file)
+                losses_tr = list(losses['losses_tr'])
+                losses_vl = list(losses['losses_vl'])
+                losses_mean = list(losses['losses_mean'])
+
 
         for ep in range(opts['restore_point_epoch'] + 1, opts['restore_point_epoch'] + opts['epochs'] + 1):
             begin = time.time()            
             print('------- epoch:', ep, '-------')
 
-            loss_tr, loss_vl, loss_mean = 0., 0., 0.            
-            table_0_count = {'tr':0, 'vl':0, 'ts':0}
+            loss_tr, loss_vl, loss_ts, loss_mean = 0., 0., 0., 0.          
 
-            # for tables_sample_tr in tqdm(sample_uniform(data.tables, sample_rate, 0), total=np.ceil(1 / sample_rate).astype(np.int32)):
+            # Training
             tr_dict = {}
             for t, table in data.tables.items():
 
@@ -153,39 +172,23 @@ def main(opts, restore_point=None):
                     vals_noisy = np.copy(vals_clean)
                     mask = np.zeros_like(vals_clean)
 
-                # inds = inds[tables_sample_tr[t]]
-                # vals_noisy = vals_noisy[tables_sample_tr[t]]
-                # mask = mask[tables_sample_tr[t]]
-                # vals_clean = vals_clean[tables_sample_tr[t]]
-
                 tr_dict[tables_pl[table.name]['indices']] = inds
                 tr_dict[tables_pl[table.name]['values']] = vals_noisy   # noisy values 
                 tr_dict[placeholders[table.name]['noise_mask']] = mask
                 tr_dict[placeholders[table.name]['values_clean']] = vals_clean  # clean values 
 
-                # if t == 'table_0':
-                #     table_0_count['tr'] += np.sum(mask)
 
 
             _, bloss_tr = sess.run([train_step, total_loss_tr], feed_dict=tr_dict)
             loss_tr += bloss_tr
 
-            # loss_tr = np.sqrt( loss_tr / table_0_count['tr'] )
             losses_tr.append(loss_tr)
             if loss_tr < loss_tr_best:
                 loss_tr_best = loss_tr
                 loss_tr_best_ep = ep
+            
 
-
-
-            preds_val = mean_tr * np.ones(data.tables['table_0'].num_obs)
-
-            preds_val_count = np.zeros(data.tables['table_0'].num_obs)
-            num_entries_val = data.tables['table_0'].num_obs_vl
-
-            # while np.sum(preds_val_count) < opts['sampling_threshold'] * num_entries_val:
-
-                # for tables_sample_vl in tqdm(sample_uniform(data.tables, sample_rate, 1), total=np.ceil(1 / sample_rate).astype(np.int32)):
+            # Validation 
             vl_dict = {}
             for t, table in data.tables.items():
                 if table.predict:                    
@@ -200,65 +203,77 @@ def main(opts, restore_point=None):
                     mask = np.zeros_like(table.values)
                     vals_noisy = np.copy(vals_clean)
 
-                # inds = inds[tables_sample_vl[t]]
-                # vals_noisy = vals_noisy[tables_sample_vl[t]]
-                # mask = mask[tables_sample_vl[t]]
-                # vals_clean = vals_clean[tables_sample_vl[t]]
-
                 vl_dict[tables_pl[table.name]['indices']] = inds
                 vl_dict[tables_pl[table.name]['values']] = vals_noisy   # noisy values 
                 vl_dict[placeholders[table.name]['noise_mask']] = mask
                 vl_dict[placeholders[table.name]['values_clean']] = vals_clean  # clean values 
 
-                # if t == 'table_0':
-                #     table_0_count['vl'] += np.sum(mask)
-                        
 
-            bloss_vl, bloss_mean, bout_vl = sess.run([rmse_loss_vl, rmse_loss_mean, tables_out_vl['table_0']['values']], feed_dict=vl_dict)
+            bloss_vl, bout_vl = sess.run([rmse_loss_vl, tables_out_vl['table_0']['values']], feed_dict=vl_dict)
             loss_vl += bloss_vl
-            loss_mean += bloss_mean
                 
-                # preds_val[tables_sample_vl['table_0']] = bout_vl[mask_split_ == 1.]
-                # preds_val_count[sample_val_] = 1 
-
-                # split_ = data.tables['table_0'].split
-                # split_out_ = split_[split_ < 2]
-
-                # preds_val[split_ == 1] = bout_vl[split_out_ == 1]
-                # preds_val_count[split_] = 1 
-
-
-            
-            # loss_vl = np.sqrt( loss_vl / table_0_count['vl'] )
-            # loss_mean = np.sqrt(loss_mean)
-
 
             print(data.tables['table_0'].values[data.tables['table_0'].split == 1][0:15])
             print(bout_vl[0:15])
 
-
             losses_vl.append(loss_vl)
-            losses_mean.append(loss_mean)
+            losses_mean.append(rmse_loss_mean)
 
 
             if loss_vl < loss_vl_best:
                 loss_vl_best = loss_vl
                 loss_vl_best_ep = ep
-
-            print("epoch {:5d} took {:.1f}s. train loss: {:5.5f}, val loss: {:5.5f} \t best train loss: {:5.5f} at epoch {:5d}, best val loss: {:5.5f} at epoch {:5d}".format(ep, time.time() - begin, loss_tr, loss_vl, loss_tr_best, loss_tr_best_ep, loss_vl_best, loss_vl_best_ep))
+                if loss_vl_last_save - loss_vl_best > 1e-3: # save if we made a .01 improvement since last save
+                    losses = {'losses_tr':losses_tr, 'losses_vl':losses_vl, 'losses_mean':losses_mean}
+                    np.savez_compressed(opts['ckpt_folder'] + "/losses.npz", **losses)
+                    save_path = saver.save(sess, opts['ckpt_folder'] + "/ep_{:05d}.ckpt".format(ep))                    
+                    print(".... model saved in file: %s" % save_path)
+                    loss_vl_last_save = loss_vl_best
             
 
-        show_last = opts['epochs']
-        plt.title('RMSE Loss')
-        plt.plot(range(opts['epochs'])[-show_last:], losses_mean[-show_last:], '.-', color='red')
-        plt.plot(range(opts['epochs'])[-show_last:], losses_tr[-show_last:], '.-', color='blue')
-        plt.plot(range(opts['epochs'])[-show_last:], losses_vl[-show_last:], '.-', color='green')
-        plt.xlabel('epoch')
-        plt.ylabel('RMSE')
-        plt.legend(('mean', 'training', 'validation'))
-        # plt.show()
-        plt.savefig("rmse.pdf", bbox_inches='tight')
-        plt.clf()
+            # Testing 
+            ts_dict = {}
+            for t, table in data.tables.items():
+                if table.predict:                    
+                    inds = table.indices # all entries
+                    vals_clean = table.values
+                    mask = (table.split == 2) * 1.
+                    vals_noisy = np.copy(vals_clean)
+                    vals_noisy[mask == 1] = noise_value
+                else: 
+                    inds = table.indices
+                    vals_clean = table.values
+                    mask = np.zeros_like(table.values)
+                    vals_noisy = np.copy(vals_clean)
+
+                ts_dict[tables_pl[table.name]['indices']] = inds
+                ts_dict[tables_pl[table.name]['values']] = vals_noisy   # noisy values 
+                ts_dict[placeholders[table.name]['noise_mask']] = mask
+                ts_dict[placeholders[table.name]['values_clean']] = vals_clean  # clean values 
+
+
+            bloss_ts, = sess.run([rmse_loss_vl], feed_dict=ts_dict)
+            loss_ts += bloss_ts
+
+            losses_ts.append(loss_ts)
+
+
+            print("epoch {:5d} took {:.1f}s. train loss: {:5.5f}, val loss: {:5.5f}, test loss {:5.5f} \t best train loss: {:5.5f} at epoch {:5d}, best val loss: {:5.5f} at epoch {:5d}".format(ep, time.time() - begin, loss_tr, loss_vl, loss_ts, loss_tr_best, loss_tr_best_ep, loss_vl_best, loss_vl_best_ep))
+            
+
+
+
+        # epochs = opts['epochs'] + opts['restore_point_epoch'] + 1
+        # plt.title('RMSE Loss')
+        # plt.plot(range(epochs), losses_mean, '.-', color='red')
+        # plt.plot(range(epochs), losses_tr, '.-', color='blue')
+        # plt.plot(range(epochs), losses_vl, '.-', color='green')
+        # plt.xlabel('epoch')
+        # plt.ylabel('RMSE')
+        # plt.legend(('mean', 'training', 'validation'))
+        # # plt.show()
+        # plt.savefig("rmse.pdf", bbox_inches='tight')
+        # plt.clf()
 
 
 
@@ -273,16 +288,19 @@ if __name__ == "__main__":
     activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu    
     regularization_rate = 0.00001
     dropout_rate = .5
-    skip_connections = False
+    skip_connections = True
     units_in = 1
+    units = 128
+    auto_restore = False
 
-    opts = {'epochs':3,
+
+    opts = {'epochs':2000,
             'learning_rate':.0001,
             'sample_rate':.2,
             'sampling_threshold':.90,
             'data_folder':'data',
             'data_set':data_set,
-            'split_rates':[.8, .2, .0], # train, validation, test split
+            'split_rates':[.8, .1, .1], # train, validation, test split
             'noise_rate':dropout_rate,
             'model_opts':{'pool_mode':'mean',
                           'dropout_rate':dropout_rate,
@@ -290,20 +308,34 @@ if __name__ == "__main__":
                           'units_in':units_in,
                           # 'units_out':units_out,
                           'layers':[
-                                    {'type':ExchangeableLayer, 'units_out':4, 'activation':activation, 'skip_connections':skip_connections},
-                                    {'type':ExchangeableLayer, 'units_out':4, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
                                     {'type':FeatureDropoutLayer, 'dropout_rate':dropout_rate},
-                                    # {'type':ExchangeableLayer, 'units_out':2, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'dropout_rate':dropout_rate},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'dropout_rate':dropout_rate},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
                                     {'type':ExchangeableLayer, 'units_out':units_in, 'activation':None, 'skip_connections':skip_connections}
                                     ],
                          },
             'verbosity':2,    
             'restore_point_epoch':-1, # To continue counting epochs after loading saved model
-            'debug':True,
+            'ckpt_folder':'checkpoints',
+            'debug':False,
             'seed':12345,
             }
 
+
+
     restore_point = None
+    if auto_restore:
+        checkpoints = sorted(glob.glob(opts['ckpt_folder'] + "/*.ckpt*"))
+        if len(checkpoints) > 0:
+            restore_point_epoch = checkpoints[-1].split(".")[0].split("_")[-1]
+            restore_point = opts['ckpt_folder'] + "/ep_" + restore_point_epoch + ".ckpt"
+            print(".... restoring from %s\n" % restore_point)
+            opts["restore_point_epoch"] = int(restore_point_epoch) # Pass num_epochs so far to start counting from there. In case of another crash 
+
 
     main(opts, restore_point)
 
