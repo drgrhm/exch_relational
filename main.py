@@ -285,16 +285,16 @@ if __name__ == "__main__":
 
     data_set = 'yelp'    
     # activation = tf.nn.relu    
-    activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu    
+    activation = lambda x: tf.nn.relu(x) - tf.cast(0.01, tf.float64)*tf.nn.relu(-x) # Leaky Relu    
     regularization_rate = 0.00001
     dropout_rate = .5
     skip_connections = True
     units_in = 1
-    units = 128
-    auto_restore = False
+    units = 42
+    auto_restore = True
 
 
-    opts = {'epochs':2000,
+    opts = {'epochs':1,
             'learning_rate':.0001,
             'sample_rate':.2,
             'sampling_threshold':.90,
@@ -318,7 +318,7 @@ if __name__ == "__main__":
                                     {'type':ExchangeableLayer, 'units_out':units_in, 'activation':None, 'skip_connections':skip_connections}
                                     ],
                          },
-            'verbosity':2,    
+            'verbosity':2,
             'restore_point_epoch':-1, # To continue counting epochs after loading saved model
             'ckpt_folder':'checkpoints',
             'debug':False,

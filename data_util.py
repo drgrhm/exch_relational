@@ -8,18 +8,16 @@ from pprint import pprint
 
 
 class DataLoader:
-
+    
     def __init__(self, data_folder, data_set, split_rates, **opts):
-
         self.data_folder = data_folder
         self.data_set = data_set        
         self.split_rates = split_rates
         self.verbosity = opts.get('verbosity', 0)
         self.resplit_data = opts.get('verbosity', True)
-
         self.entites = {'user':0, 'business':1, 'category':2}
-        
         self.tables = self._load_tables()
+
 
     def _load_tables(self):
 

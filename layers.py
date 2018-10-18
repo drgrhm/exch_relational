@@ -17,22 +17,35 @@ class Layer:
 
         # TODO refactor 2 cases into 1 
         units_out = self.units_out
-        inds = self.expand_tensor_indices(indices, units_out)
-        num_vals = tf.shape(inds)[0]
+        inds = self.expand_tensor_indices(indices, units_out)        
+        # num_vals = tf.shape(inds)[0]
+        num_vals = tf.shape(inds, out_type=tf.int64)[0]
+
+        num_vals = tf.cast(num_vals, tf.int64)
+        begin_ = tf.cast([0,0], tf.int64)
+        end_ = tf.cast([num_vals, 2], tf.int64)
+        strides_ = tf.cast([units_out, 1], tf.int64)
+
+        num_vals = tf.cast(num_vals, tf.int64)
+        units_out = tf.cast(units_out, tf.int64)
+        temp_shape_ = tf.cast([-1,units_out], tf.int64)
+
         if axis == 0:
-            temp_inds = tf.strided_slice(inds, begin=[0,0], end=[num_vals,2], strides=[units_out,1])
+            # temp_inds = tf.strided_slice(inds, begin=[0,0], end=[num_vals,2], strides=[units_out,1])
+            temp_inds = tf.strided_slice(inds, begin=begin_, end=end_, strides=strides_)
             temp_inds = tf.slice(temp_inds, begin=[0,1], size=[-1,1])
-            new_vals = tf.cast(tf.gather_nd(tf.reshape(marginal, shape=[-1,units_out]), temp_inds), tf.float64)
-            vals = tf.reshape(table_values, shape=[-1,units_out]) + new_vals
-            vals = tf.reshape(vals, shape=[num_vals])
+            new_vals = tf.cast(tf.gather_nd(tf.reshape(marginal, shape=temp_shape_), temp_inds), tf.float64)
+            vals = tf.reshape(table_values, shape=temp_shape_) + new_vals
+            vals = tf.reshape(vals, shape=[-1])
         elif axis == 1:
-            temp_inds = tf.strided_slice(inds, begin=[0,0], end=[num_vals,2], strides=[units_out,1])
+            # temp_inds = tf.strided_slice(inds, begin=[0,0], end=[num_vals,2], strides=[units_out,1])
+            temp_inds = tf.strided_slice(inds, begin=begin_, end=end_, strides=strides_)
             temp_inds = tf.slice(temp_inds, begin=[0,0], size=[-1,1])
-            new_vals = tf.cast(tf.gather_nd(tf.reshape(marginal, shape=[-1,units_out]), temp_inds), tf.float64)
-            vals = tf.reshape(table_values, shape=[-1,units_out]) + new_vals
-            vals = tf.reshape(vals, shape=[num_vals])
+            new_vals = tf.cast(tf.gather_nd(tf.reshape(marginal, shape=temp_shape_), temp_inds), tf.float64)
+            vals = tf.reshape(table_values, shape=temp_shape_) + new_vals
+            vals = tf.reshape(vals, shape=[-1])
         elif axis == None:
-            vals = tf.reshape(table_values, shape=[-1,units_out])
+            vals = tf.reshape(table_values, shape=temp_shape_)
             vals = tf.reshape(tf.add(vals, marginal), shape=[-1])
         return vals
 
@@ -40,12 +53,18 @@ class Layer:
     # Given a list of indices in [N,M], return 'equivalent' indices in [N,M,units]
     def expand_tensor_indices(self, indices, units):
 
-        num_vals = tf.shape(indices)[0]
-        inds_exp = tf.reshape(tf.tile(tf.range(units, dtype=tf.float64), multiples=[num_vals]), shape=[-1, 1]) # expand dimension of mask indices
+        # num_vals = tf.shape(indices)[0]
+        num_vals = tf.cast(tf.shape(indices)[0], tf.int64)
+        shape_ = tf.cast([-1,1], tf.int64)
+        units_ = tf.cast(units, tf.int64)
+        multiples_ = tf.cast([num_vals], tf.int64)
+
+        inds_exp = tf.reshape(tf.tile(tf.cast(tf.range(units_, dtype=tf.int64), tf.float64), multiples=multiples_), shape=shape_) # expand dimension of mask indices
+
         indices = tf.cast(indices, dtype=tf.float64) # cast so computation can be done on gpu
-        inds = tf.tile(indices, multiples=[units,1]) # duplicate indices units times
-        inds = tf.reshape(inds, shape=[units, num_vals, 2])
-        inds = tf.reshape(tf.transpose(inds, perm=[1,0,2]), shape=[-1,2])
+        inds = tf.tile(indices, multiples=tf.cast([units,1], tf.int64)) # duplicate indices units times
+        inds = tf.reshape(inds, shape=tf.cast([units_, num_vals, 2], tf.int64))
+        inds = tf.reshape(tf.transpose(inds, perm=tf.cast([1,0,2], tf.int64)), shape=tf.cast([-1,2], tf.int64))
         inds = tf.concat((inds, inds_exp), axis=1)
         inds = tf.cast(inds, dtype=tf.int64)
         return inds
@@ -108,19 +127,19 @@ class Layer:
             count = tf.unsorted_segment_sum(tf.ones_like(inds, dtype=tf.float64), inds, num_segments)
             count = tf.cast(tf.expand_dims(count, axis=1), dtype=tf.float64)
             if keep_dims:
-                count = tf.reshape(count, shape=[1,-1,1])
+                count = tf.reshape(count, shape=tf.cast([1,-1,1], tf.int64))
         elif axis == 1:
             inds = table['indices'][:,0]
             num_segments = table['shape'][0]
             count = tf.unsorted_segment_sum(tf.ones_like(inds, dtype=tf.float64), inds, num_segments)
             count = tf.cast(tf.expand_dims(count, axis=1), dtype=tf.float64)
             if keep_dims:
-                count = tf.reshape(count, shape=[-1,1,1])
+                count = tf.reshape(count, shape=tf.cast([-1,1,1], tf.int64))
         elif axis is None:
             inds = table['indices']
             count = tf.cast(tf.shape(inds)[0], dtype=tf.float64)
             if keep_dims:
-                count = tf.reshape(count, shape=[1,1,1])            
+                count = tf.reshape(count, shape=tf.cast([1,1,1], tf.int64))           
         return count
 
 
@@ -185,7 +204,7 @@ class ExchangeableLayer(Layer):
             params['table_0']['theta_2x0_11'] = tf.get_variable(name=('table_0_theta_2x0_11'), shape=[units_in, units_out], dtype=tf.float64)            
 
             vals_0 = tf.reshape(tf.matmul(tf.reshape(tables['table_0']['values'], [-1, units_in]),  params['table_0']['theta_00']), [-1])
-            
+
             vals_0_10 = tf.tensordot(marg_0_10, params['table_0']['theta_10'], axes=1)
             vals_0 = self.broadcast_add_marginal(vals_0, vals_0_10, tables['table_0']['indices'], axis=0)
 
@@ -266,6 +285,7 @@ class ExchangeableLayer(Layer):
 
             vals_2 = tf.reshape(vals_2, [-1,units_out]) + params['theta_b']
             vals_2 = tf.reshape(vals_2, [-1])
+
 
 
             if self.activation is not None:
