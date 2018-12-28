@@ -1,7 +1,8 @@
-import numpy as np
+# import numpy as np
 import sqlite3
 from itertools import groupby
 from util import *
+from table import Table, ToyTable
 
 
 class DataLoader:
@@ -10,7 +11,8 @@ class DataLoader:
 
         self.data_folder = data_folder
         self.data_set = data_set
-        self.team_player, self.team_match = self._load_tables(split_sizes, num_features, team_match_one_hot)
+        # self.team_player, self.team_match = self._load_tables(split_sizes, num_features, team_match_one_hot)
+        self.tables = self._load_tables(split_sizes, num_features, team_match_one_hot)
 
 
     def _load_tables(self, split_sizes, num_features, team_match_one_hot=False):
@@ -27,6 +29,9 @@ class DataLoader:
             vals1 = np.array([ 3,2,0,-3,-1,0,1,-2,2,-2 ])
             shape1 = np.array([6,5])
             table1 = Table(1, inds1, vals1, shape1, split_sizes, num_features=num_features, one_hot=team_match_one_hot, split_mode='by_col')
+
+            # return table0, table1
+            return {'team_player':table0, 'team_match':table1}
 
         elif self.data_set == 'soccer':
 
@@ -98,100 +103,144 @@ class DataLoader:
 
             conn.close()
 
-        return table0, table1
-        
+            # return table0, table1
+            return {'team_player': table0, 'team_match': table1}
 
 
-class Table:
+class ToyDataLoader:
 
-    def __init__(self, tid, indices, values, shape, split_sizes, num_features, one_hot=False, split_mode='uniform'):
-        tr, vl, ts = split_sizes
-        assert tr+vl+ts == 1, "(" + str(tr) + ", " + str(vl) + ", " + str(ts) + ") is not a valid train/valid/test split"
-        n = values.shape[0]
+    def __init__(self, sizes, embedding_size, sparsity, alphas):
+        self.sizes = sizes
+        self._n_students = sizes[0]
+        self._n_courses = sizes[1]
+        self._n_profs = sizes[2]
+        self._embedding_size = embedding_size
 
-        if split_mode == 'uniform':
-            n_ts = int(n*ts)
-            n_vl = int(n*vl)
-            n_tr = n - n_ts - n_vl
-            split = np.concatenate((np.zeros(n_tr, np.int32), np.ones(n_vl, np.int32), 2*np.ones(n_ts, np.int32)))
-            np.random.shuffle(split)
-        
-        elif split_mode == 'by_col': # So that the two entries for each match are in the same tr/vl/ts split 
-            n_cols = shape[1]
-            n_cols_ts = int(n_cols*ts)
-            n_cols_vl = int(n_cols*vl)
-            n_cols_tr = n_cols - n_cols_ts - n_cols_vl
-            col_split = np.concatenate((np.zeros(n_cols_tr, np.int32), np.ones(n_cols_vl, np.int32), 2*np.ones(n_cols_ts, np.int32)))
-            np.random.shuffle(col_split)
-            split = np.take(col_split, indices[:,1])
+        assert embedding_size <= 2, 'Currently only embedding size of 1 or 2 are supported'
 
-            n_ts = np.sum(split == 2)
-            n_vl = np.sum(split == 1)
-            n_tr = n - n_ts - n_vl
+        self._sparsity = sparsity
+        self._alphas = alphas
+
+        self.embeddings = self._make_embeddings()
+        self.tables = self._make_tables()
+
+    def _make_embeddings(self):
+
+        student_embeds = self._gaussian_embeddings(size=self._n_students)
+        course_embeds = self._gaussian_embeddings(size=self._n_courses)
+        prof_embeds = self._gaussian_embeddings(size=self._n_profs)
+
+        return {'student': student_embeds, 'course': course_embeds, 'prof':prof_embeds}
 
 
+    def _make_tables(self):
+        """Construct all tables in our toy problem, populated with random data"""
+        se = self.embeddings['student']
+        ce = self.embeddings['course']
+        pe = self.embeddings['prof']
 
+        table_sc = self._make_table(se, ce, 0)
+        table_sp = self._make_table(se, pe, 1)
+        # table_cp = self._make_table(ce, pe, 2)
 
-        # if one_hot:
-        #     split = np.array([i for i in split for _ in range(num_features)])
-        #     indices = expand_indices(indices, num_features)
-        #     new_vals = []
-        #     for val in values:
-        #         if val > 0:
-        #             new_vals.append([1,0,0])
-        #         elif val < 0:
-        #             new_vals.append([0,0,1])
-        #         elif val == 0:
-        #             new_vals.append([0,1,0])
-        #     new_vals = np.reshape(np.array(new_vals), [-1])
-        #     values = new_vals
+        return {'student_course': table_sc, 'student_prof':table_sp}
 
 
 
-        if num_features > 1:
-            # split = np.array([i for i in split for _ in range(num_features)])
-            # indices = expand_indices(indices, num_features)
+    def _make_table(self, row_embeds, col_embeds, tid):
 
-            if one_hot: # TODO fix so generalizes better i.e. not just 3 features 
-                new_vals = []
-                for val in values:
-                    if val > 0:
-                        new_vals.append([1,0,0])
-                    elif val < 0:
-                        new_vals.append([0,0,1])
-                    elif val == 0:
-                        new_vals.append([0,1,0])                
-            else:
-                new_vals = np.array([[val,0,0] for val in values])
+        n_rows = row_embeds.shape[0]
+        n_cols = col_embeds.shape[0]
+        a = self._alphas
 
-            new_vals = np.reshape(np.array(new_vals), [-1])
-            values = new_vals
+        tab = np.zeros((n_rows, n_cols))
 
+        if self._embedding_size == 1:
+            for i in range(n_rows):
+                for j in range(n_cols):
+                    tab[i, j] = a[0] * row_embeds[i] * col_embeds[j]
 
-        self._set_data_splits(indices, values, split, num_features)
-        self.shape = shape
-        self.mean_tr = np.mean(self.values_tr)
-        self.num_values_tr = n_tr
-        self.num_values = n
+        elif self._embedding_size == 2:
+            for i in range(n_rows):
+                for j in range(n_cols):
+                    tab[i, j] = a[0] * row_embeds[i, 0] * col_embeds[j, 0] + \
+                                a[1] * row_embeds[i, 0] * col_embeds[j, 1] + \
+                                a[2] * row_embeds[i, 1] * col_embeds[j, 0] + \
+                                a[3] * row_embeds[i, 1] * col_embeds[j, 1]
 
+        else:
+            raise Exception('invalid embedding size')
 
-    def _set_data_splits(self, indices, values, split, num_features):
-        self.indices_all = indices
-        self.indices_tr = indices[split == 0]
-        self.indices_vl = indices[split == 1]
-        self.indices_tr_vl = indices[split <= 1]
-        self.indices_ts = indices[split == 2]
-        self.split = split
-        
-        split = np.array([i for i in split for _ in range(num_features)])
+        shape = (n_rows, n_cols)
+        observed = self._choose_observed(shape)
+        inds = np.array(np.nonzero(observed)).T
+        vals = tab.flatten()[observed.flatten() == 1]
 
-        self.values_all = values
-        self.values_tr = values[split == 0]
-        self.values_vl = values[split == 1]
-        self.values_tr_vl = values[split <= 1]
-        self.values_ts = values[split == 2]
-        
+        return ToyTable(tid, inds, vals, shape, num_features=self._embedding_size, embeddings=self.embeddings)
 
 
 
+    def _choose_observed(self, shape):
+        """Which entries of the matrix to consider as observed. """
+        return np.random.choice([0,1], shape, p=(1-self._sparsity, self._sparsity))
+
+
+
+    def _gaussian_embeddings(self, size):
+        """Multivariate Gaussian feature embeddings."""
+        means = np.random.normal(0, 10, size=self._embedding_size)
+        stds = np.random.uniform(1, 10, size=self._embedding_size)
+        embeds = np.random.multivariate_normal(means, np.diag(stds), size=size)
+        return embeds
+
+
+
+    # def plot_embeds(self, embeds, predicts, title, plot_name, sort=False):
+    #
+    #     assert embeds.shape[1] == 2
+    #     assert embeds.shape == predicts.shape
+    #
+    #     if sort:
+    #         score = np.zeros((embeds.shape[0], 5))
+    #         score[:,0] = embeds[:,0] * embeds[:,1]
+    #         score[:,1:3] = embeds
+    #         score[:,3:] = predicts
+    #         score.view('f8,f8,f8,f8,f8').sort(order=['f0'], axis=0)
+    #         embeds = score[:, 1:3]
+    #         predicts = score[:, 3:]
+    #
+    #     plt.title(title)
+    #     plt.plot(embeds[:,0], embeds[:,1], '.', color='blue')
+    #     plt.plot(predicts[:,0], predicts[:,1], '.', color='green')
+    #     plt.xlabel('feature 0')
+    #     plt.ylabel('feature 1')
+    #     plt.legend(('embeddings', 'predictions'))
+    #     plt.show()
+    #     plt.savefig(plot_name + '.pdf', bbox_inches='tight')
+    #     plt.clf()
+    #
+    #
+    # def plot_feature(self, embeds, predicts, title, plot_name, sort=True):
+    #
+    #     assert embeds.shape == predicts.shape
+    #
+    #     n = embeds.shape[0]
+    #
+    #     if sort:
+    #         score = np.zeros((n, 2))
+    #         score[:,0] = embeds
+    #         score[:,1] = predicts
+    #         score.view('f8,f8').sort(order=['f0'], axis=0)
+    #         embeds = score[:,0]
+    #         predicts = score[:,1]
+    #
+    #     plt.title(title)
+    #     plt.plot(range(n), embeds, '.-', color='blue')
+    #     plt.plot(range(n), predicts, '.-', color='green')
+    #     plt.xlabel('item')
+    #     plt.ylabel('feature')
+    #     plt.legend(('embeddings', 'predictions'))
+    #     plt.show()
+    #     plt.savefig(plot_name + '.pdf', bbox_inches='tight')
+    #     plt.clf()
 

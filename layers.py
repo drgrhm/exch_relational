@@ -134,76 +134,149 @@ class ExchangeableLayer(Layer):
         self.pool_mode = kwargs['pool_mode']
         self.activation = kwargs['activation']
         self.skip_connections = kwargs.get('skip_connections', False)
+        self.output_embeddings = kwargs.get('output_embeddings', False)
+        self.embedding_size = kwargs.get('embedding_size', 2)
         self.scope = kwargs['scope']
         self.params = {}
 
 
-    def get_output(self, team_player, team_match, reuse=None, is_training=True):
+    def get_output(self, tables, reuse=None, is_training=True):
         units_in = self.units_in
         units_out = self.units_out
         params = self.params
 
         with tf.variable_scope(self.scope, initializer=tf.random_normal_initializer(0, .01), reuse=reuse):
-            
-            params['theta_000'] = tf.get_variable(name='theta_000', shape=[units_in, units_out])
-            params['theta_001'] = tf.get_variable(name='theta_001', shape=[units_in, units_out])
-            params['theta_010'] = tf.get_variable(name='theta_010', shape=[units_in, units_out])
-            params['theta_011'] = tf.get_variable(name='theta_011', shape=[units_in, units_out])
-            params['theta_100'] = tf.get_variable(name='theta_100', shape=[units_in, units_out])
-            params['theta_101'] = tf.get_variable(name='theta_101', shape=[units_in, units_out])
-            params['theta_110'] = tf.get_variable(name='theta_110', shape=[units_in, units_out])
-            params['theta_111'] = tf.get_variable(name='theta_111', shape=[units_in, units_out])
+
+            # todo:
+            student_course = tables['student_course']
+            # student_prof = tables['student_prof']
+
+            row_embeds = student_course.get('row_embeds', None)
+            col_embeds = student_course.get('col_embeds', None)
 
 
-            team_player_marg_01 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=0, keep_dims=True) # team-player table, marginalized over teams [1 x N_players x units]       
-            team_player_marg_10 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-player table, marginalized over players [N_teams x 1 x units]
-            team_player_marg_11 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-player table, marginalized over both [1 x 1 x units]
+            if row_embeds is not None and col_embeds is not None:
+                pass
+            else:
+                params['theta_sc_sel'] = tf.get_variable(name='theta_sc_sel', shape=[units_in, units_out])
+                params['theta_sc_row'] = tf.get_variable(name='theta_sc_row', shape=[units_in, units_out])
+                params['theta_sc_col'] = tf.get_variable(name='theta_sc_col', shape=[units_in, units_out])
+                params['theta_sc_all'] = tf.get_variable(name='theta_sc_all', shape=[units_in, units_out])
+                # params['theta_sc_sp'] = tf.get_variable(name='theta_sc_sp', shape=[units_in, units_out])
 
-            team_match_marg_01 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=0, keep_dims=True) # team-match table, marginalized over teams [1 x N_matches x units]       
-            team_match_marg_10 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-match table, marginalized over matches [N_teams x 1 x units]
-            team_match_marg_11 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-match table, marginalized over both [1 x 1 x units]
-
-
-            team_player_vals_01 = tf.tensordot(team_player_marg_01, params['theta_101'], axes=1) #[1 x N_players x K]
-            team_player_vals_10 = tf.tensordot(team_player_marg_10, params['theta_110'], axes=1) #[N_teams x 1 x K]
-            team_player_vals_11 = tf.tensordot(team_player_marg_11, params['theta_111'], axes=1) #[1 x 1 x K]
-
-            team_match_vals_01 = tf.tensordot(team_match_marg_01, params['theta_011'], axes=1) #[1 x 1 x K]
-            team_match_vals_10 = tf.tensordot(team_match_marg_10, params['theta_110'], axes=1) #[N_teams x 1 x K]
-            team_match_vals_11 = tf.tensordot(team_match_marg_11, params['theta_111'], axes=1) #[1 x 1 x K]
+                # params['theta_sp_sel'] = tf.get_variable(name='theta_sp_sel', shape=[units_in, units_out])
+                # params['theta_sp_row'] = tf.get_variable(name='theta_sp_row', shape=[units_in, units_out])
+                # params['theta_sp_col'] = tf.get_variable(name='theta_sp_col', shape=[units_in, units_out])
+                # params['theta_sp_all'] = tf.get_variable(name='theta_sp_all', shape=[units_in, units_out])
+                # params['theta_sp_sc'] = tf.get_variable(name='theta_sp_sc', shape=[units_in, units_out])
 
 
-            team_player_vals = tf.reshape(tf.matmul(tf.reshape(team_player['values'], shape=[-1,units_in]), params['theta_100']), [-1])
-            team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_01, team_player['indices'], axis=0)
-            team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_10, team_player['indices'], axis=1)        
-            team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_11, team_player['indices'], axis=None)
-            team_player_vals = self.broadcast_add_marginal(team_player_vals, team_match_vals_10, team_player['indices'], axis=1)
-            team_player_vals = self.broadcast_add_marginal(team_player_vals, team_match_vals_11, team_player['indices'], axis=None)
+                student_course_marg_row = self.marginalize_table(student_course, pool_mode=self.pool_mode, axis=0, keep_dims=True)  # student_course table, marginalized over students [1 x N_courses x units_in]
+                student_course_marg_col = self.marginalize_table(student_course, pool_mode=self.pool_mode, axis=1, keep_dims=True)  # student_course table, marginalized over courses [N_students x 1 x units_in]
+                student_course_marg_all = self.marginalize_table(student_course, pool_mode=self.pool_mode, axis=None, keep_dims=True)  # student_course table, marginalized over both [1 x 1 x units_in]
 
+                student_course_vals_row = tf.tensordot(student_course_marg_row, params['theta_sc_row'], axes=1)  # [1 x N_courses x units_out]
+                student_course_vals_col = tf.tensordot(student_course_marg_col, params['theta_sc_col'], axes=1)  # [N_students x 1 x units_out]
+                student_course_vals_all = tf.tensordot(student_course_marg_all, params['theta_sc_all'], axes=1)  # [1 x 1 x units_out]
 
-            team_match_vals = tf.reshape(tf.matmul(tf.reshape(team_match['values'], shape=[-1,units_in]), params['theta_010']), [-1])
-            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_01, team_match['indices'], axis=0)
-            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_10, team_match['indices'], axis=1)
-            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_11, team_match['indices'], axis=None)
-            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_player_vals_10, team_match['indices'], axis=1)
-            team_match_vals = self.broadcast_add_marginal(team_match_vals, team_player_vals_11, team_match['indices'], axis=None)
+                student_course_vals = tf.reshape(tf.matmul(tf.reshape(student_course['values'], shape=[-1, units_in]), params['theta_sc_sel']), [-1])
+                student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_row, student_course['indices'], axis=0)
+                student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_col, student_course['indices'], axis=1)
+                student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_all, student_course['indices'], axis=None)
 
 
             if self.activation is not None:
-                team_player_vals = self.activation(team_player_vals)
-                team_match_vals = self.activation(team_match_vals)
-
+                student_course_vals = self.activation(student_course_vals)
 
             if self.skip_connections and units_in == units_out:
-                team_player_vals = team_player_vals + team_player['values'],
-                team_match_vals = team_match_vals + team_match['values'],
+                student_course_vals = student_course_vals + student_course['values']
+
+            student_course_out = {'indices': student_course['indices'],
+                                  'values': student_course_vals,
+                                  'shape': student_course['shape']}
+
+            if self.output_embeddings:
+                student_course_out['row_embeds'] = tf.cast(tf.squeeze(student_course_vals_col, axis=1), tf.float32)
+                student_course_out['col_embeds'] = tf.cast(tf.squeeze(student_course_vals_row, axis=0), tf.float32)
 
 
-            team_player_out = {'indices':team_player['indices'], 'values':team_player_vals, 'shape':team_player['shape']}
-            team_match_out = {'indices':team_match['indices'], 'values':team_match_vals, 'shape':team_match['shape']}
+            return {'student_course':student_course_out}
 
-            
-            return team_player_out, team_match_out
+
+
+
+
+
+
+    # def get_output(self, team_player, team_match, reuse=None, is_training=True):
+    #     units_in = self.units_in
+    #     units_out = self.units_out
+    #     params = self.params
+    #
+    #     with tf.variable_scope(self.scope, initializer=tf.random_normal_initializer(0, .01), reuse=reuse):
+    #
+    #         params['theta_000'] = tf.get_variable(name='theta_000', shape=[units_in, units_out])
+    #         params['theta_001'] = tf.get_variable(name='theta_001', shape=[units_in, units_out])
+    #         params['theta_010'] = tf.get_variable(name='theta_010', shape=[units_in, units_out])
+    #         params['theta_011'] = tf.get_variable(name='theta_011', shape=[units_in, units_out])
+    #         params['theta_100'] = tf.get_variable(name='theta_100', shape=[units_in, units_out])
+    #         params['theta_101'] = tf.get_variable(name='theta_101', shape=[units_in, units_out])
+    #         params['theta_110'] = tf.get_variable(name='theta_110', shape=[units_in, units_out])
+    #         params['theta_111'] = tf.get_variable(name='theta_111', shape=[units_in, units_out])
+    #
+    #
+    #         team_player_marg_01 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=0, keep_dims=True) # team-player table, marginalized over teams [1 x N_players x units]
+    #         team_player_marg_10 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-player table, marginalized over players [N_teams x 1 x units]
+    #         team_player_marg_11 = self.marginalize_table(team_player, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-player table, marginalized over both [1 x 1 x units]
+    #
+    #         team_match_marg_01 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=0, keep_dims=True) # team-match table, marginalized over teams [1 x N_matches x units]
+    #         team_match_marg_10 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=1, keep_dims=True) # team-match table, marginalized over matches [N_teams x 1 x units]
+    #         team_match_marg_11 = self.marginalize_table(team_match, pool_mode=self.pool_mode, axis=None, keep_dims=True) # team-match table, marginalized over both [1 x 1 x units]
+    #
+    #
+    #         team_player_vals_01 = tf.tensordot(team_player_marg_01, params['theta_101'], axes=1) #[1 x N_players x K]
+    #         team_player_vals_10 = tf.tensordot(team_player_marg_10, params['theta_110'], axes=1) #[N_teams x 1 x K]
+    #         team_player_vals_11 = tf.tensordot(team_player_marg_11, params['theta_111'], axes=1) #[1 x 1 x K]
+    #
+    #         team_match_vals_01 = tf.tensordot(team_match_marg_01, params['theta_011'], axes=1) #[1 x 1 x K]
+    #         team_match_vals_10 = tf.tensordot(team_match_marg_10, params['theta_110'], axes=1) #[N_teams x 1 x K]
+    #         team_match_vals_11 = tf.tensordot(team_match_marg_11, params['theta_111'], axes=1) #[1 x 1 x K]
+    #
+    #
+    #         team_player_vals = tf.reshape(tf.matmul(tf.reshape(team_player['values'], shape=[-1,units_in]), params['theta_100']), [-1])
+    #         team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_01, team_player['indices'], axis=0)
+    #         team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_10, team_player['indices'], axis=1)
+    #         team_player_vals = self.broadcast_add_marginal(team_player_vals, team_player_vals_11, team_player['indices'], axis=None)
+    #         team_player_vals = self.broadcast_add_marginal(team_player_vals, team_match_vals_10, team_player['indices'], axis=1)
+    #         team_player_vals = self.broadcast_add_marginal(team_player_vals, team_match_vals_11, team_player['indices'], axis=None)
+    #
+    #
+    #         team_match_vals = tf.reshape(tf.matmul(tf.reshape(team_match['values'], shape=[-1,units_in]), params['theta_010']), [-1])
+    #         team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_01, team_match['indices'], axis=0)
+    #         team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_10, team_match['indices'], axis=1)
+    #         team_match_vals = self.broadcast_add_marginal(team_match_vals, team_match_vals_11, team_match['indices'], axis=None)
+    #         team_match_vals = self.broadcast_add_marginal(team_match_vals, team_player_vals_10, team_match['indices'], axis=1)
+    #         team_match_vals = self.broadcast_add_marginal(team_match_vals, team_player_vals_11, team_match['indices'], axis=None)
+    #
+    #
+    #         if self.activation is not None:
+    #             team_player_vals = self.activation(team_player_vals)
+    #             team_match_vals = self.activation(team_match_vals)
+    #
+    #
+    #         if self.skip_connections and units_in == units_out:
+    #             team_player_vals = team_player_vals + team_player['values'],
+    #             team_match_vals = team_match_vals + team_match['values'],
+    #
+    #
+    #         team_player_out = {'indices':team_player['indices'], 'values':team_player_vals, 'shape':team_player['shape']}
+    #         team_match_out = {'indices':team_match['indices'], 'values':team_match_vals, 'shape':team_match['shape']}
+    #
+    #
+    #         return team_player_out, team_match_out
+
+
+
 
 
 
@@ -215,24 +288,36 @@ class FeatureDropoutLayer(Layer):
         self.scope = kwargs['scope']
 
 
-    def get_output(self, team_player, team_match, reuse=None, is_training=True):
+    def get_output(self, tables, reuse=None, is_training=True):
 
-        team_player_vals = tf.layers.dropout(tf.reshape(team_player['values'], [-1, self.units_in]), rate=self.dropout_rate, training=is_training)
-        team_player_vals = tf.reshape(team_player_vals, [-1])
+        student_course = tables['student_course']
 
-        team_match_vals = tf.layers.dropout(tf.reshape(team_match['values'], [-1, self.units_in]), rate=self.dropout_rate, training=is_training)
-        team_match_vals = tf.reshape(team_match_vals, [-1])
+        student_course_vals = tf.layers.dropout(tf.reshape(student_course['values'], [-1, self.units_in]), noise_shape=[1, self.units_in], rate=self.dropout_rate, training=is_training)
+        student_course_vals = tf.reshape(student_course_vals, [-1])
 
+        row_embeds = student_course.get('row_embeds', None)
+        col_embeds = student_course.get('col_embeds', None)
 
-        team_player_out = {'indices':team_player['indices'], 'values':team_player_vals, 'shape':team_player['shape']}
-        team_match_out = {'indices':team_match['indices'], 'values':team_match_vals, 'shape':team_match['shape']}
-        
-        return team_player_out, team_match_out
+        student_course_out = {'indices':student_course['indices'],
+                              'values':student_course_vals,
+                              'shape':student_course['shape'],
+                              'row_embed':row_embeds,
+                              'col_embed':col_embeds}
+
+        return {'student_course': student_course_out}
 
     
 
+class PoolingLayer(Layer):
+
+    def __init__(self, units, **kwargs):
+        Layer.__init__(self, units)
+        self.scope = kwargs['scope']
 
 
+    def get_output(self, tables, reuse=None, is_training=True):
+
+        return tables
 
 
 

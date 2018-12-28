@@ -17,16 +17,32 @@ class Model:
             units_out = layer['units_out']
             activation = layer.get('activation', None)
             skip_connections = layer.get('skip_connections', False)
-            self.layers[name] = layer['type'](units=[units_in, units_out], pool_mode=pool_mode, dropout_rate=dropout_rate, activation=activation, skip_connections=skip_connections, scope=name)
+            output_embeddings = layer.get('output_embeddings', False)
+            embedding_size = layer.get('embedding_size', 2)
+            self.layers[name] = layer['type'](units=[units_in, units_out],
+                                              pool_mode=pool_mode,
+                                              dropout_rate=dropout_rate,
+                                              activation=activation,
+                                              skip_connections=skip_connections,
+                                              output_embeddings=output_embeddings,
+                                              embedding_size = embedding_size,
+                                              scope=name)
             units_in = units_out
 
 
-    def get_output(self, team_player, team_match, reuse=None, is_training=True):
-        tp, tm = team_player, team_match
+    # def get_output(self, team_player, team_match, reuse=None, is_training=True):
+    #     tp, tm = team_player, team_match
+    #     for l in range(self.num_layers):
+    #         name = 'layer_' + str(l)
+    #         tp, tm = self.layers[name].get_output(tp, tm, reuse=reuse, is_training=is_training)
+    #     return tp, tm
+
+    def get_output(self, tables, reuse=None, is_training=True):
+        tables_out = tables
         for l in range(self.num_layers):
             name = 'layer_' + str(l)
-            tp, tm = self.layers[name].get_output(tp, tm, reuse=reuse, is_training=is_training)
-        return tp, tm
+            tables_out = self.layers[name].get_output(tables_out, reuse=reuse, is_training=is_training)
+        return tables_out
         
 
 
