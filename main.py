@@ -1,7 +1,6 @@
 import numpy as np
 import tensorflow as tf
 import matplotlib
-# import scipy
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
@@ -384,85 +383,6 @@ def main(opts, restore_point=None):
     #     plt.savefig("pred.pdf", bbox_inches='tight')
 
 
-def plot_feature(embeds, predicts, title, plot_name, item_name, sort=False):
-
-    assert embeds.shape == predicts.shape
-
-    n = embeds.shape[0]
-
-    if sort:
-        score = np.zeros((n, 2))
-        score[:,0] = embeds
-        score[:,1] = predicts
-        score.view('f8,f8').sort(order=['f0'], axis=0)
-        embeds = score[:,0]
-        predicts = score[:,1]
-
-    plt.title(title)
-    plt.plot(range(n), embeds, '.-', color='blue')
-    plt.plot(range(n), predicts, '.-', color='green')
-    plt.xlabel(item_name)
-    plt.ylabel('feature value')
-    plt.legend(('embeddings', 'predictions'))
-    plt.show()
-    plt.savefig('img/' + plot_name + '.pdf', bbox_inches='tight')
-    plt.clf()
-
-def plot_embeddings(embeds, predicts, title, plot_name, sort=False):
-
-    assert embeds.shape[1] == 2
-    assert embeds.shape == predicts.shape
-
-    if sort:
-        score = np.zeros((embeds.shape[0], 5))
-        score[:,0] = embeds[:,0] * embeds[:,1]
-        score[:,1:3] = embeds
-        score[:,3:] = predicts
-        score.view('f8,f8,f8,f8,f8').sort(order=['f0'], axis=0)
-        embeds = score[:, 1:3]
-        predicts = score[:, 3:]
-
-    plt.title(title)
-    plt.plot(embeds[:,0], embeds[:,1], '.', color='blue')
-    plt.plot(predicts[:,0], predicts[:,1], '.', color='green')
-    plt.xlabel('feature 0')
-    plt.ylabel('feature 1')
-    plt.legend(('embeddings', 'predictions'))
-    plt.show()
-    plt.savefig(plot_name + '.pdf', bbox_inches='tight')
-    plt.clf()
-
-
-def plot_features(embeds, predicts, title, plot_name, sort=False):
-
-    assert embeds.shape[1] == 2
-    assert embeds.shape == predicts.shape
-
-    if sort:
-        score = np.zeros((embeds.shape[0], 5))
-        score[:,0] = embeds[:,0] * embeds[:,1]
-        score[:,1:3] = embeds
-        score[:,3:] = predicts
-        score.view('f8,f8,f8,f8,f8').sort(order=['f0'], axis=0)
-        embeds = score[:, 1:3]
-        predicts = score[:, 3:]
-
-    plt.title(title)
-    # plt.plot(embeds[:,0], embeds[:,1], '.', color='blue')
-    # plt.plot(predicts[:,0], predicts[:,1], '.', color='green')
-    # plt.xlabel('feature 0')
-    # plt.ylabel('feature 1')
-    # plt.legend(('embeddings', 'predictions'))
-
-    s = [5 * math.log(1 + i) for i in embeds[:,0]]
-    c = [opts['epochs'] - i for i in embeds[:,1]]
-    plt.scatter(predicts[:,0], predicts[:,1], s=s, c=c)
-
-    plt.show()
-    plt.savefig('img/' + plot_name + '.pdf', bbox_inches='tight')
-    plt.clf()
-
-
 if __name__ == "__main__":
     np.set_printoptions(suppress=True,linewidth=np.nan,threshold=np.nan)
 
@@ -527,8 +447,8 @@ if __name__ == "__main__":
             'restore_point_epoch':-1,
             'save_model':save_model,
             'debug':True,
-            # 'seed':9858776,
-            'seed': 9870112,
+            'seed':9858776,
+            # 'seed': 9870112,
             }
 
     restore_point = None

@@ -317,6 +317,8 @@ class PoolingLayer(Layer):
 
     def get_output(self, tables, reuse=None, is_training=True):
 
+        student_course = tables['student_course']
+
         return tables
 
 
