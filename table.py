@@ -66,6 +66,7 @@ class Table:
             new_vals = np.reshape(np.array(new_vals), [-1])
             values = new_vals
 
+        self.tid = tid
         self._set_data_splits(indices, values, split, num_features)
         self.shape = shape
         self.mean_tr = np.mean(self.values_tr)
@@ -92,16 +93,16 @@ class Table:
 
 
 
-class ToyTable:
-
-    def __init__(self, tid, indices, values, shape, num_features, embeddings):
-
-        n = values.shape[0]
-
-        self.shape = shape
-        self.num_values = n
-        self.embeddings = embeddings
-        self.indices = indices
-        self.values = values
+# class ToyTable:
+#
+#     def __init__(self, tid, indices, values, shape, num_features, embeddings):
+#
+#         n = values.shape[0]
+#
+#         self.shape = shape
+#         self.num_values = n
+#         self.embeddings = embeddings
+#         self.indices = indices
+#         self.values = values
 
 

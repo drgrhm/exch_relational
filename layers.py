@@ -14,7 +14,7 @@ class Layer:
     ## Produces a sparse tensor with the same shape as x_sp, and non-zero values corresponding to those of x_sp
     def broadcast_add_marginal(self, table_values, marginal, indices, axis=None):
 
-        # TODO refactor 2 cases into 1 
+        # TODO refactor 2 cases into 1
         units_out = self.units_out
         inds = self.expand_tensor_indices(indices, units_out)
         num_vals = tf.shape(inds)[0]
@@ -134,7 +134,7 @@ class ExchangeableLayer(Layer):
         self.pool_mode = kwargs['pool_mode']
         self.activation = kwargs['activation']
         self.skip_connections = kwargs.get('skip_connections', False)
-        self.output_embeddings = kwargs.get('output_embeddings', False)
+        # self.output_embeddings = kwargs.get('output_embeddings', False)
         self.embedding_size = kwargs.get('embedding_size', 2)
         self.scope = kwargs['scope']
         self.params = {}
@@ -156,7 +156,23 @@ class ExchangeableLayer(Layer):
 
 
             if row_embeds is not None and col_embeds is not None:
-                pass
+
+                params['theta_sc_row_embed'] = tf.get_variable(name='theta_sc_row_embed', shape=[units_in, units_out])
+                params['theta_sc_col_embed'] = tf.get_variable(name='theta_sc_col_embed', shape=[units_in, units_out])
+                params['theta_sc_row_embed_pool'] = tf.get_variable(name='theta_sc_row_embed_pool', shape=[units_in, units_out])
+                params['theta_sc_col_embed_pool'] = tf.get_variable(name='theta_sc_col_embed_pool', shape=[units_in, units_out])
+
+                student_course_vals_row = tf.tensordot(row_embeds, params['theta_sc_row_embed'], axes=1) # [N_students x 1 x units_out]
+                student_course_vals_col = tf.tensordot(col_embeds, params['theta_sc_col_embed'], axes=1)  # [1 x N_courses x units_out]
+                student_course_vals_row_pool = tf.tensordot(tf.reduce_sum(row_embeds, axis=0, keepdims=True), params['theta_sc_row_embed_pool'], axes=1)
+                student_course_vals_col_pool = tf.tensordot(tf.reduce_sum(col_embeds, axis=1, keepdims=True), params['theta_sc_col_embed_pool'], axes=1)
+
+                student_course_vals = tf.zeros(tf.shape(student_course['indices'])[0] * units_out, tf.float32)
+                student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_row, student_course['indices'], axis=1)
+                student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_col, student_course['indices'], axis=0)
+                student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_row_pool, student_course['indices'], axis=None)
+                student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_col_pool, student_course['indices'], axis=None)
+
             else:
                 params['theta_sc_sel'] = tf.get_variable(name='theta_sc_sel', shape=[units_in, units_out])
                 params['theta_sc_row'] = tf.get_variable(name='theta_sc_row', shape=[units_in, units_out])
@@ -194,10 +210,6 @@ class ExchangeableLayer(Layer):
             student_course_out = {'indices': student_course['indices'],
                                   'values': student_course_vals,
                                   'shape': student_course['shape']}
-
-            if self.output_embeddings:
-                student_course_out['row_embeds'] = tf.cast(tf.squeeze(student_course_vals_col, axis=1), tf.float32)
-                student_course_out['col_embeds'] = tf.cast(tf.squeeze(student_course_vals_row, axis=0), tf.float32)
 
 
             return {'student_course':student_course_out}
@@ -301,8 +313,8 @@ class FeatureDropoutLayer(Layer):
         student_course_out = {'indices':student_course['indices'],
                               'values':student_course_vals,
                               'shape':student_course['shape'],
-                              'row_embed':row_embeds,
-                              'col_embed':col_embeds}
+                              'row_embeds':row_embeds,
+                              'col_embeds':col_embeds}
 
         return {'student_course': student_course_out}
 
@@ -312,12 +324,19 @@ class PoolingLayer(Layer):
 
     def __init__(self, units, **kwargs):
         Layer.__init__(self, units)
+        self._pool_mode = kwargs['pool_mode']
         self.scope = kwargs['scope']
 
 
     def get_output(self, tables, reuse=None, is_training=True):
 
         student_course = tables['student_course']
+
+        row_embeds = self.marginalize_table(student_course, pool_mode=self._pool_mode, axis=1, keep_dims=True)  # student_course table, marginalized over courses [N_students x 1 x units_in]
+        col_embeds = self.marginalize_table(student_course, pool_mode=self._pool_mode, axis=0, keep_dims=True)  # student_course table, marginalized over students [1 x N_courses x units_in]
+
+        tables['student_course']['row_embeds'] = row_embeds
+        tables['student_course']['col_embeds'] = col_embeds
 
         return tables
 

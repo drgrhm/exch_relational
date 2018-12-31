@@ -2,7 +2,7 @@
 import sqlite3
 from itertools import groupby
 from util import *
-from table import Table, ToyTable
+from table import Table
 
 
 class DataLoader:
@@ -109,17 +109,18 @@ class DataLoader:
 
 class ToyDataLoader:
 
-    def __init__(self, sizes, embedding_size, sparsity, alphas):
+    def __init__(self, sizes, sparsity, split_sizes, num_features, embedding_size):
         self.sizes = sizes
         self._n_students = sizes[0]
         self._n_courses = sizes[1]
         self._n_profs = sizes[2]
+        self._split_sizes = split_sizes
+        self._num_features = num_features
         self._embedding_size = embedding_size
 
-        assert embedding_size <= 2, 'Currently only embedding size of 1 or 2 are supported'
+        assert embedding_size == 2, 'Currently only embedding size of 2 is supported'
 
         self._sparsity = sparsity
-        self._alphas = alphas
 
         self.embeddings = self._make_embeddings()
         self.tables = self._make_tables()
@@ -139,50 +140,89 @@ class ToyDataLoader:
         ce = self.embeddings['course']
         pe = self.embeddings['prof']
 
-        table_sc = self._make_table(se, ce, 0)
-        table_sp = self._make_table(se, pe, 1)
+        table_sc = self._make_table(se, ce, tid=0)
+        # table_sp = self._make_table(se, pe, tid=1)
         # table_cp = self._make_table(ce, pe, 2)
 
-        return {'student_course': table_sc, 'student_prof':table_sp}
-
+        return {'student_course': table_sc}
 
 
     def _make_table(self, row_embeds, col_embeds, tid):
 
         n_rows = row_embeds.shape[0]
         n_cols = col_embeds.shape[0]
-        a = self._alphas
-
+        alpha = 2 * np.random.randn(4)
         tab = np.zeros((n_rows, n_cols))
 
-        if self._embedding_size == 1:
+        if self._embedding_size == 2:
             for i in range(n_rows):
                 for j in range(n_cols):
-                    tab[i, j] = a[0] * row_embeds[i] * col_embeds[j]
-
-        elif self._embedding_size == 2:
-            for i in range(n_rows):
-                for j in range(n_cols):
-                    tab[i, j] = a[0] * row_embeds[i, 0] * col_embeds[j, 0] + \
-                                a[1] * row_embeds[i, 0] * col_embeds[j, 1] + \
-                                a[2] * row_embeds[i, 1] * col_embeds[j, 0] + \
-                                a[3] * row_embeds[i, 1] * col_embeds[j, 1]
+                    tab[i, j] = self._mixture_data(alpha, row_embeds[i, :], col_embeds[j, :])
+                    # tab[i, j] = self._product_data(alpha, row_embeds[i, :], col_embeds[j, :])
 
         else:
             raise Exception('invalid embedding size')
 
         shape = (n_rows, n_cols)
-        observed = self._choose_observed(shape)
+        observed = self._choose_observed(tid, shape, min_observed=2)
         inds = np.array(np.nonzero(observed)).T
         vals = tab.flatten()[observed.flatten() == 1]
 
-        return ToyTable(tid, inds, vals, shape, num_features=self._embedding_size, embeddings=self.embeddings)
+        return Table(tid, inds, vals, shape, self._split_sizes, num_features=self._num_features, embeddings=self.embeddings)
+
+
+    def _product_data(self, alpha, row_embed, col_embed, weighted=True):
+        """Produce data values by a (weighted) inner product of row and column embeddings."""
+        if weighted:
+            a = alpha
+        else:
+            a = np.ones_like(alpha)
+        return a[0] * row_embed[0] * col_embed[0] + \
+               a[1] * row_embed[0] * col_embed[1]
+
+
+    def _mixture_data(self, alpha, row_embed, col_embed):
+        """Produce data values in a manner similar to _product_data, but doesn't imply that row_embed, col_embed are in same space."""
+        return alpha[0] * row_embed[0] * col_embed[0] + \
+               alpha[1] * row_embed[0] * col_embed[1] + \
+               alpha[2] * row_embed[1] * col_embed[0] + \
+               alpha[3] * row_embed[1] * col_embed[1]
 
 
 
-    def _choose_observed(self, shape):
-        """Which entries of the matrix to consider as observed. """
-        return np.random.choice([0,1], shape, p=(1-self._sparsity, self._sparsity))
+
+    def _choose_observed(self, tid, shape, min_observed=1):
+        """Which entries of the matrix to consider as observed."""
+
+        obs = np.random.choice([0,1], shape, p=(1-self._sparsity, self._sparsity))
+
+        rows = np.sum(obs, axis=1)
+        for i in  np.array(range(shape[0]))[rows < min_observed]:
+            jj = np.random.choice(range(shape[1]), min_observed, replace=False)
+            obs[i, jj] = 1
+
+        cols = np.sum(obs, axis=0)
+        for j in  np.array(range(shape[1]))[cols < min_observed]:
+            ii = np.random.choice(range(shape[0]), min_observed, replace=False)
+            obs[ii, j] = 1
+
+        print("final density of observed values in table ", tid,  ": ", np.sum(obs) / (shape[0] * shape[1]))
+
+        return obs
+
+
+    # def _ensure_observed(self, n_observed, min_observed, n_self, n_other):
+    #     """Make sure there are some observed values in each row/column."""
+    #     n_zeros = sum(n_observed < min_observed)
+    #
+    #     out = np.zeros((n_zeros, n_other))
+    #     for i in range(n_zeros):
+    #         vec = np.concatenate((np.ones(min_observed), np.zeros(n_self - min_observed)))
+    #         np.random.shuffle(vec)
+    #         out[i, :] = vec
+    #
+    #
+    #     return out
 
 
 

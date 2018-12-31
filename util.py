@@ -89,7 +89,7 @@ def plot_embeddings(embeds, predicts, title, plot_name, sort=False):
     plt.clf()
 
 
-def plot_features(embeds, predicts, title, plot_name, sort=False):
+def plot_features(embeds, predicts, title, plot_name, sort=False, plot_rate=1.):
 
     assert embeds.shape[1] == 2
     assert embeds.shape == predicts.shape
@@ -103,20 +103,31 @@ def plot_features(embeds, predicts, title, plot_name, sort=False):
         embeds = score[:, 1:3]
         predicts = score[:, 3:]
 
+    if plot_rate < 1.:
+        mask = np.random.choice((0,1), size=embeds.shape[0], replace=True, p=(1-plot_rate, plot_rate))
+        embeds = embeds[mask == 1,:]
+        predicts = predicts[mask == 1, :]
+
     plt.title(title)
-    # plt.plot(embeds[:,0], embeds[:,1], '.', color='blue')
-    # plt.plot(predicts[:,0], predicts[:,1], '.', color='green')
-    # plt.xlabel('feature 0')
-    # plt.ylabel('feature 1')
-    # plt.legend(('embeddings', 'predictions'))
-
-    # s = [5 * math.log(1 + i) for i in embeds[:,0]]
-    s = 5 * normalize(embeds[:,0])
-    c = normalize([embeds.shape[0] - i for i in embeds[:,1]])
-    print(s)
-    print(c)
+    s = 30 * sigmoid(normalize(embeds[:,0]))
+    c = sigmoid(normalize([embeds.shape[0] - i for i in embeds[:,1]]))
     plt.scatter(predicts[:,0], predicts[:,1], s=s, c=c)
-
+    # plt.scatter(sigmoid(normalize(predicts[:, 0])), sigmoid(normalize(predicts[:, 1])), s=s, c=c)
+    plt.xlabel('feature 0')
+    plt.ylabel('feature 1')
     plt.show()
     plt.savefig('img/' + plot_name + '.pdf', bbox_inches='tight')
+    plt.clf()
+
+
+def plot_loss(losses_tr, losses_vl, title, file_name):
+    n = len(losses_tr)
+    plt.title(title)
+    plt.plot(range(n), losses_tr, '.-', color='blue')
+    plt.plot( range(n), losses_vl, '.-', color='green')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.legend(('training', 'validation'))
+    plt.show()
+    plt.savefig('img/' + file_name + '.pdf', bbox_inches='tight')
     plt.clf()
