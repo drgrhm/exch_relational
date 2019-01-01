@@ -120,14 +120,20 @@ def plot_features(embeds, predicts, title, plot_name, sort=False, plot_rate=1.):
     plt.clf()
 
 
-def plot_loss(losses_tr, losses_vl, title, file_name):
+def plot_loss(losses_tr, losses_vl, mean_tr, title, file_name):
     n = len(losses_tr)
     plt.title(title)
-    plt.plot(range(n), losses_tr, '.-', color='blue')
-    plt.plot( range(n), losses_vl, '.-', color='green')
     plt.xlabel('epoch')
     plt.ylabel('loss')
-    plt.legend(('training', 'validation'))
+    plt.plot(range(n), losses_tr, '.-', color='blue')
+    plt.plot(range(n), losses_vl, '.-', color='green')
+    if mean_tr is not None:
+        plt.plot(range(n), mean_tr * np.ones(n), '-', color='red')
+        plt.legend(('training', 'validation', 'mean'))
+    else:
+        plt.legend(('training', 'validation'))
     plt.show()
     plt.savefig('img/' + file_name + '.pdf', bbox_inches='tight')
     plt.clf()
+
+

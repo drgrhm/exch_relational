@@ -109,7 +109,7 @@ class DataLoader:
 
 class ToyDataLoader:
 
-    def __init__(self, sizes, sparsity, split_sizes, num_features, embedding_size):
+    def __init__(self, sizes, sparsity, split_sizes, num_features, embedding_size, min_observed):
         self.sizes = sizes
         self._n_students = sizes[0]
         self._n_courses = sizes[1]
@@ -117,6 +117,7 @@ class ToyDataLoader:
         self._split_sizes = split_sizes
         self._num_features = num_features
         self._embedding_size = embedding_size
+        self._min_observed = min_observed
 
         assert embedding_size == 2, 'Currently only embedding size of 2 is supported'
 
@@ -141,10 +142,10 @@ class ToyDataLoader:
         pe = self.embeddings['prof']
 
         table_sc = self._make_table(se, ce, tid=0)
-        # table_sp = self._make_table(se, pe, tid=1)
-        # table_cp = self._make_table(ce, pe, 2)
+        table_sp = self._make_table(se, pe, tid=1)
+        # table_cp = self._make_table(ce, pe, tid=2)
 
-        return {'student_course': table_sc}
+        return {'student_course': table_sc, 'student_prof':table_sp}
 
 
     def _make_table(self, row_embeds, col_embeds, tid):
@@ -164,7 +165,7 @@ class ToyDataLoader:
             raise Exception('invalid embedding size')
 
         shape = (n_rows, n_cols)
-        observed = self._choose_observed(tid, shape, min_observed=2)
+        observed = self._choose_observed(tid, shape, min_observed=self._min_observed)
         inds = np.array(np.nonzero(observed)).T
         vals = tab.flatten()[observed.flatten() == 1]
 
