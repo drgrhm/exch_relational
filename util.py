@@ -137,3 +137,10 @@ def plot_loss(losses_tr, losses_vl, mean_tr, title, file_name):
     plt.clf()
 
 
+def gaussian_embeddings(embedding_size, n_embeddings):
+    """Multivariate Gaussian feature embeddings."""
+    means = np.random.normal(0, 10, embedding_size)
+    stds = np.random.uniform(1, 10, embedding_size)
+    embeds = np.random.multivariate_normal(means, np.diag(stds), size=n_embeddings)
+    return embeds
+

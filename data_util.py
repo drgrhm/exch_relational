@@ -109,7 +109,7 @@ class DataLoader:
 
 class ToyDataLoader:
 
-    def __init__(self, sizes, sparsity, split_sizes, num_features, embedding_size, min_observed):
+    def __init__(self, sizes, sparsity, split_sizes, num_features, embedding_size, min_observed, embeddings=None, alpha=None, observed=None):
         self.sizes = sizes
         self._n_students = sizes[0]
         self._n_courses = sizes[1]
@@ -119,77 +119,71 @@ class ToyDataLoader:
         self._embedding_size = embedding_size
         self._min_observed = min_observed
 
+        if observed is None or alpha is None:
+            self._observed = {'sc':None, 'sp':None, 'cp':None}
+            self._alpha = {'sc':None, 'sp':None, 'cp':None}
+        else:
+            self._observed = observed
+            self._alpha = alpha
+
         assert embedding_size == 2, 'Currently only embedding size of 2 is supported'
 
         self._sparsity = sparsity
 
-        self.embeddings = self._make_embeddings()
+        if embeddings is None:
+            self.embeddings = self._make_embeddings()
+        else:
+            self.embeddings = embeddings
+
         self.tables = self._make_tables()
 
     def _make_embeddings(self):
 
-        student_embeds = self._gaussian_embeddings(size=self._n_students)
-        course_embeds = self._gaussian_embeddings(size=self._n_courses)
-        prof_embeds = self._gaussian_embeddings(size=self._n_profs)
+        student_embeds = gaussian_embeddings(embedding_size=self._embedding_size, n_embeddings=self._n_students)
+        course_embeds = gaussian_embeddings(embedding_size=self._embedding_size, n_embeddings=self._n_courses)
+        prof_embeds = gaussian_embeddings(embedding_size=self._embedding_size, n_embeddings=self._n_profs)
 
         return {'student': student_embeds, 'course': course_embeds, 'prof':prof_embeds}
 
 
     def _make_tables(self):
         """Construct all tables in our toy problem, populated with random data"""
-        se = self.embeddings['student']
-        ce = self.embeddings['course']
-        pe = self.embeddings['prof']
+        embeds_s = self.embeddings['student']
+        embeds_c = self.embeddings['course']
+        embeds_p = self.embeddings['prof']
 
-        table_sc = self._make_table(se, ce, tid=0)
-        table_sp = self._make_table(se, pe, tid=1)
-        # table_cp = self._make_table(ce, pe, tid=2)
+        table_sc = self._make_table(embeds_s, embeds_c, tid=0, observed=self._observed['sc'], alpha=self._alpha['sc'])
+        table_sp = self._make_table(embeds_s, embeds_p, tid=1, observed=self._observed['sp'], alpha=self._alpha['sp'])
+        table_cp = self._make_table(embeds_c, embeds_p, tid=2, observed=self._observed['cp'], alpha=self._alpha['cp'])
 
-        return {'student_course': table_sc, 'student_prof':table_sp}
+        return {'student_course': table_sc, 'student_prof':table_sp, 'course_prof':table_cp}
 
 
-    def _make_table(self, row_embeds, col_embeds, tid):
+    def _make_table(self, row_embeds, col_embeds, tid, observed=None, alpha=None):
 
         n_rows = row_embeds.shape[0]
         n_cols = col_embeds.shape[0]
-        alpha = 2 * np.random.randn(4)
+        shape = (n_rows, n_cols)
         tab = np.zeros((n_rows, n_cols))
+
+        if alpha is None:
+            alpha = 2 * np.random.randn(4)
 
         if self._embedding_size == 2:
             for i in range(n_rows):
                 for j in range(n_cols):
                     tab[i, j] = self._mixture_data(alpha, row_embeds[i, :], col_embeds[j, :])
                     # tab[i, j] = self._product_data(alpha, row_embeds[i, :], col_embeds[j, :])
-
         else:
             raise Exception('invalid embedding size')
 
-        shape = (n_rows, n_cols)
-        observed = self._choose_observed(tid, shape, min_observed=self._min_observed)
+        if observed is None:
+            observed = self._choose_observed(tid, shape, min_observed=self._min_observed)
+
         inds = np.array(np.nonzero(observed)).T
         vals = tab.flatten()[observed.flatten() == 1]
 
         return Table(tid, inds, vals, shape, self._split_sizes, num_features=self._num_features, embeddings=self.embeddings)
-
-
-    def _product_data(self, alpha, row_embed, col_embed, weighted=True):
-        """Produce data values by a (weighted) inner product of row and column embeddings."""
-        if weighted:
-            a = alpha
-        else:
-            a = np.ones_like(alpha)
-        return a[0] * row_embed[0] * col_embed[0] + \
-               a[1] * row_embed[0] * col_embed[1]
-
-
-    def _mixture_data(self, alpha, row_embed, col_embed):
-        """Produce data values in a manner similar to _product_data, but doesn't imply that row_embed, col_embed are in same space."""
-        return alpha[0] * row_embed[0] * col_embed[0] + \
-               alpha[1] * row_embed[0] * col_embed[1] + \
-               alpha[2] * row_embed[1] * col_embed[0] + \
-               alpha[3] * row_embed[1] * col_embed[1]
-
-
 
 
     def _choose_observed(self, tid, shape, min_observed=1):
@@ -212,76 +206,19 @@ class ToyDataLoader:
         return obs
 
 
-    # def _ensure_observed(self, n_observed, min_observed, n_self, n_other):
-    #     """Make sure there are some observed values in each row/column."""
-    #     n_zeros = sum(n_observed < min_observed)
-    #
-    #     out = np.zeros((n_zeros, n_other))
-    #     for i in range(n_zeros):
-    #         vec = np.concatenate((np.ones(min_observed), np.zeros(n_self - min_observed)))
-    #         np.random.shuffle(vec)
-    #         out[i, :] = vec
-    #
-    #
-    #     return out
+    def _product_data(self, alpha, row_embed, col_embed, weighted=True):
+        """Produce data values by a (weighted) inner product of row and column embeddings."""
+        if weighted:
+            a = alpha
+        else:
+            a = np.ones_like(alpha)
+        return a[0] * row_embed[0] * col_embed[0] + \
+               a[1] * row_embed[0] * col_embed[1]
 
 
-
-    def _gaussian_embeddings(self, size):
-        """Multivariate Gaussian feature embeddings."""
-        means = np.random.normal(0, 10, size=self._embedding_size)
-        stds = np.random.uniform(1, 10, size=self._embedding_size)
-        embeds = np.random.multivariate_normal(means, np.diag(stds), size=size)
-        return embeds
-
-
-
-    # def plot_embeds(self, embeds, predicts, title, plot_name, sort=False):
-    #
-    #     assert embeds.shape[1] == 2
-    #     assert embeds.shape == predicts.shape
-    #
-    #     if sort:
-    #         score = np.zeros((embeds.shape[0], 5))
-    #         score[:,0] = embeds[:,0] * embeds[:,1]
-    #         score[:,1:3] = embeds
-    #         score[:,3:] = predicts
-    #         score.view('f8,f8,f8,f8,f8').sort(order=['f0'], axis=0)
-    #         embeds = score[:, 1:3]
-    #         predicts = score[:, 3:]
-    #
-    #     plt.title(title)
-    #     plt.plot(embeds[:,0], embeds[:,1], '.', color='blue')
-    #     plt.plot(predicts[:,0], predicts[:,1], '.', color='green')
-    #     plt.xlabel('feature 0')
-    #     plt.ylabel('feature 1')
-    #     plt.legend(('embeddings', 'predictions'))
-    #     plt.show()
-    #     plt.savefig(plot_name + '.pdf', bbox_inches='tight')
-    #     plt.clf()
-    #
-    #
-    # def plot_feature(self, embeds, predicts, title, plot_name, sort=True):
-    #
-    #     assert embeds.shape == predicts.shape
-    #
-    #     n = embeds.shape[0]
-    #
-    #     if sort:
-    #         score = np.zeros((n, 2))
-    #         score[:,0] = embeds
-    #         score[:,1] = predicts
-    #         score.view('f8,f8').sort(order=['f0'], axis=0)
-    #         embeds = score[:,0]
-    #         predicts = score[:,1]
-    #
-    #     plt.title(title)
-    #     plt.plot(range(n), embeds, '.-', color='blue')
-    #     plt.plot(range(n), predicts, '.-', color='green')
-    #     plt.xlabel('item')
-    #     plt.ylabel('feature')
-    #     plt.legend(('embeddings', 'predictions'))
-    #     plt.show()
-    #     plt.savefig(plot_name + '.pdf', bbox_inches='tight')
-    #     plt.clf()
-
+    def _mixture_data(self, alpha, row_embed, col_embed):
+        """Produce data values in a manner similar to _product_data, but doesn't imply that row_embed, col_embed are in same space."""
+        return alpha[0] * row_embed[0] * col_embed[0] + \
+               alpha[1] * row_embed[0] * col_embed[1] + \
+               alpha[2] * row_embed[1] * col_embed[0] + \
+               alpha[3] * row_embed[1] * col_embed[1]

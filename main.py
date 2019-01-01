@@ -23,12 +23,15 @@ def main(opts, restore_point=None):
     if opts['debug']:
         np.random.seed(opts['seed'])
 
-    data = ToyDataLoader(opts['toy_data']['size'],
-                         opts['toy_data']['sparsity'],
-                         opts['split_sizes'],
-                         opts['encoder_opts']['units_in'],
-                         opts['toy_data']['embedding_size'],
-                         opts['toy_data']['min_observed'])
+
+    data = opts.get('data', None)
+    if data is None:
+        data = ToyDataLoader(opts['toy_data']['size'],
+                             opts['toy_data']['sparsity'],
+                             opts['split_sizes'],
+                             opts['encoder_opts']['units_in'],
+                             opts['toy_data']['embedding_size'],
+                             opts['toy_data']['min_observed'])
 
 
     with tf.Graph().as_default():
@@ -53,6 +56,14 @@ def main(opts, restore_point=None):
         # student_prof['values_noisy'] = tf.placeholder(tf.float32, shape=(None), name='student_course_values_noisy')
         student_prof['shape'] = data.tables['student_prof'].shape
 
+        ## Container for course_prof data (no loss calculated)
+        course_prof = {}
+        course_prof['indices'] = tf.placeholder(tf.int32, shape=(None, 2), name='course_prof_indices')
+        course_prof['values'] = tf.placeholder(tf.float32, shape=(None), name='course_prof_values')
+        # course_prof['noise_mask'] = tf.placeholder(tf.float32, shape=(None), name='course_course_noise_mask') # Not needed if no loss calculated in this table
+        # course_prof['values_noisy'] = tf.placeholder(tf.float32, shape=(None), name='course_course_values_noisy')
+        course_prof['shape'] = data.tables['course_prof'].shape
+
 
 
         ## Encoder
@@ -67,6 +78,11 @@ def main(opts, restore_point=None):
         encoder_tables['student_prof']['indices'] = student_prof['indices']
         encoder_tables['student_prof']['values'] = student_prof['values']
         encoder_tables['student_prof']['shape'] = student_prof['shape']
+
+        encoder_tables['course_prof'] = {}
+        encoder_tables['course_prof']['indices'] = course_prof['indices']
+        encoder_tables['course_prof']['values'] = course_prof['values']
+        encoder_tables['course_prof']['shape'] = course_prof['shape']
 
 
         with tf.variable_scope('encoder'):
@@ -89,6 +105,12 @@ def main(opts, restore_point=None):
         decoder_tables['student_prof']['col_embeds'] = encoder_out_tr['student_prof']['col_embeds']
         decoder_tables['student_prof']['shape'] = student_prof['shape']
 
+        decoder_tables['course_prof'] = {}
+        decoder_tables['course_prof']['indices'] = course_prof['indices']
+        decoder_tables['course_prof']['row_embeds'] = encoder_out_tr['course_prof']['row_embeds']  # not passing encoder output values to decoder, just embeddings
+        decoder_tables['course_prof']['col_embeds'] = encoder_out_tr['course_prof']['col_embeds']
+        decoder_tables['course_prof']['shape'] = course_prof['shape']
+
 
 
         with tf.variable_scope('decoder'):
@@ -101,9 +123,9 @@ def main(opts, restore_point=None):
         rec_loss_vl = rmse_loss(student_course['values'], decoder_out_vl['student_course']['values'], student_course['noise_mask'])
 
 
-        # train_step = tf.train.AdamOptimizer(opts['learning_rate']).minimize(rec_loss_tr)
+        train_step = tf.train.AdamOptimizer(opts['learning_rate']).minimize(rec_loss_tr)
         # train_step = tf.train.MomentumOptimizer(opts['learning_rate'], 0.1).minimize(rec_loss_tr)
-        train_step = tf.train.RMSPropOptimizer(opts['learning_rate'], 0.99, momentum=0.9).minimize(rec_loss_tr)
+        # train_step = tf.train.RMSPropOptimizer(opts['learning_rate'], 0.99, momentum=0.9).minimize(rec_loss_tr)
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
         sess.run(tf.global_variables_initializer())
 
@@ -162,6 +184,8 @@ def main(opts, restore_point=None):
                        student_course['values_noisy']:vals_tr, # values used for making predictions
                        student_prof['indices']:data.tables['student_prof'].indices_tr,
                        student_prof['values']:data.tables['student_prof'].values_tr,
+                       course_prof['indices']:data.tables['course_prof'].indices_tr,
+                       course_prof['values']:data.tables['course_prof'].values_tr,
                        }
 
             _, loss_tr, student_embeds_out_tr, course_embeds_out_tr, prof_embeds_out_tr = sess.run([train_step,
@@ -190,6 +214,8 @@ def main(opts, restore_point=None):
                        student_course['values_noisy']:vals_vl, # values used for making predictions
                        student_prof['indices']:data.tables['student_prof'].indices_tr_vl,
                        student_prof['values']:data.tables['student_prof'].values_tr_vl,
+                       course_prof['indices']:data.tables['course_prof'].indices_tr_vl,
+                       course_prof['values']:data.tables['course_prof'].values_tr_vl,
                        }
 
             loss_vl, student_embeds_out_vl, course_embeds_out_vl, prof_embeds_out_vl = sess.run([rec_loss_vl,
@@ -224,12 +250,12 @@ def main(opts, restore_point=None):
                              loss_vl_best_ep=loss_vl_best_ep)
                     loss_file.close()
 
-                    embeds_path = os.path.join(opts['checkpoints_folder'], 'embeddings.npz')
+                    embeds_path = os.path.join(opts['checkpoints_folder'], 'embeddings_BEST.npz')
                     embeds_file = open(embeds_path, 'wb')
                     np.savez(embeds_file,
                              student_embeds_in=data.tables['student_course'].embeddings['student'],
                              course_embeds_in=data.tables['student_course'].embeddings['course'],
-                             prof_embeds_in=data.tables['student_prof'].embeddings['prof'],                        
+                             prof_embeds_in=data.tables['student_prof'].embeddings['prof'],
                              student_embeds_out_tr=student_embeds_out_tr,
                              course_embeds_out_tr=course_embeds_out_tr,
                              prof_embeds_out_tr=prof_embeds_out_tr,
@@ -292,7 +318,7 @@ def main(opts, restore_point=None):
             model_path = os.path.join(opts['checkpoints_folder'], 'final.ckpt')
             saver.save(sess, model_path)
 
-            embeds_path = os.path.join(opts['checkpoints_folder'], 'embeddings.npz')
+            embeds_path = os.path.join(opts['checkpoints_folder'], 'embeddings_final.npz')
             embeds_file = open(embeds_path, 'wb')
             np.savez(embeds_file,
                      student_embeds_in=data.tables['student_course'].embeddings['student'],
@@ -306,6 +332,7 @@ def main(opts, restore_point=None):
                      prof_embeds_out_vl=prof_embeds_out_vl)
             embeds_file.close()
 
+
         print("Student embeds")
         print(np.squeeze(student_embeds_out_tr)[:10,:])
         print("Course embeds")
@@ -318,13 +345,37 @@ def main(opts, restore_point=None):
         plot_loss(losses_tr, losses_vl, mean_tr, 'loss', 'loss')
         half_n = len(losses_tr) // 2
         plot_loss(losses_tr[half_n:], losses_vl[half_n:], mean_tr, 'loss - last 1/2 of epochs', 'loss_last')
+
+
+
+
         plot_features(data.tables['student_course'].embeddings['student'], np.squeeze(student_embeds_out_tr), 'Student embeddings (train)', 'student_embeddings_tr', sort=False, plot_rate=1.)
         plot_features(data.tables['student_course'].embeddings['course'], np.squeeze(course_embeds_out_tr), 'Course embeddings (train)', 'course_embeddings_tr', sort=False, plot_rate=1.)
         plot_features(data.tables['student_prof'].embeddings['prof'], np.squeeze(prof_embeds_out_tr), 'Prof embeddings (train)', 'prof_embeddings_tr', sort=False, plot_rate=1.)
-        plot_features(data.tables['student_course'].embeddings['student'], np.squeeze(student_embeds_out_vl), 'Student embeddings (validation)', 'student_embeddings_vl', sort=False, plot_rate=1.)
-        plot_features(data.tables['student_course'].embeddings['course'], np.squeeze(course_embeds_out_vl), 'Course embeddings (validation)', 'course_embeddings_vl', sort=False, plot_rate=1.)
-        plot_features(data.tables['student_prof'].embeddings['prof'], np.squeeze(prof_embeds_out_vl), 'Prof embeddings (validation)', 'prof_embeddings_vl', sort=False, plot_rate=1.)
 
+
+        # plot_features(data.tables['student_course'].embeddings['student'], np.squeeze(student_embeds_out_vl), 'Student embeddings (validation)', 'student_embeddings_vl', sort=False, plot_rate=1.)
+        # plot_features(data.tables['student_course'].embeddings['course'], np.squeeze(course_embeds_out_vl), 'Course embeddings (validation)', 'course_embeddings_vl', sort=False, plot_rate=1.)
+        # plot_features(data.tables['student_prof'].embeddings['prof'], np.squeeze(prof_embeds_out_vl), 'Prof embeddings (validation)', 'prof_embeddings_vl', sort=False, plot_rate=1.)
+
+        students_tr = np.unique(data.tables['student_course'].indices_tr[:, 0])
+        student_embeds_in_tr = data.tables['student_course'].embeddings['student'][students_tr, :]
+        student_embeds_out_tr = np.squeeze(student_embeds_out_tr)[students_tr, :]
+
+        courses_tr = np.unique(data.tables['student_course'].indices_tr[:, 1])
+        course_embeds_in_tr = data.tables['student_course'].embeddings['course'][courses_tr, :]
+        course_embeds_out_tr = np.squeeze(course_embeds_out_tr)[courses_tr, :]
+
+        profs_tr = np.unique(data.tables['student_prof'].indices_tr[:, 1])
+        prof_embeds_in_tr = data.tables['student_prof'].embeddings['prof'][profs_tr, :]
+        prof_embeds_out_tr = np.squeeze(prof_embeds_out_tr)[profs_tr, :]
+
+        plot_features(student_embeds_in_tr, student_embeds_out_tr, 'Student embeddings (train) - Obs', 'student_embeddings_tr_obs', sort=False, plot_rate=1.)
+        plot_features(course_embeds_in_tr, course_embeds_out_tr, 'Course embeddings (train) - Obs', 'course_embeddings_tr_obs', sort=False, plot_rate=1.)
+        plot_features(prof_embeds_in_tr, prof_embeds_out_tr, 'Prof embeddings (train) - Obs', 'prof_embeddings_tr_obs', sort=False, plot_rate=1.)
+
+
+        return loss_vl_best
 
 
 if __name__ == "__main__":
@@ -341,22 +392,22 @@ if __name__ == "__main__":
 
     # activation = tf.nn.relu
     activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
-    dropout_rate = 0.2
+    dropout_rate = 0.02
     skip_connections = True
 
     auto_restore = False
-    save_model = True
+    save_model = False
 
 
-    opts = {'epochs':100,
+    opts = {'epochs':1000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1], # train, validation, test split
             'noise_rate':dropout_rate,
             'regularization_rate':.00001,
             'learning_rate':.0001,
-            'toy_data':{'size':[3000, 2000, 1000],
-                        'sparsity':.005,
+            'toy_data':{'size':[1000, 700, 500],
+                        'sparsity':.01,
                         'embedding_size':embedding_size,
                         'min_observed':2, # generate at least 2 entries per row and column (sparsity rate will be affected)
             },
