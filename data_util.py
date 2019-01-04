@@ -126,7 +126,7 @@ class ToyDataLoader:
             self._observed = observed
             self._alpha = alpha
 
-        assert embedding_size == 2, 'Currently only embedding size of 2 is supported'
+        # assert embedding_size == 2, 'Currently only embedding size of 2 is supported'
 
         self._sparsity = sparsity
 
@@ -167,15 +167,14 @@ class ToyDataLoader:
         tab = np.zeros((n_rows, n_cols))
 
         if alpha is None:
-            alpha = 2 * np.random.randn(4)
+            num_alpha = max(4, self._embedding_size)
+            alpha = 2 * np.random.randn(num_alpha)
 
-        if self._embedding_size == 2:
-            for i in range(n_rows):
-                for j in range(n_cols):
-                    tab[i, j] = self._mixture_data(alpha, row_embeds[i, :], col_embeds[j, :])
-                    # tab[i, j] = self._product_data(alpha, row_embeds[i, :], col_embeds[j, :])
-        else:
-            raise Exception('invalid embedding size')
+
+        for i in range(n_rows):
+            for j in range(n_cols):
+                # tab[i, j] = self._mixture_data(alpha, row_embeds[i, :], col_embeds[j, :])
+                tab[i, j] = self._product_data(alpha, row_embeds[i, :], col_embeds[j, :])
 
         if observed is None:
             observed = self._choose_observed(tid, shape, min_observed=self._min_observed)
@@ -212,12 +211,15 @@ class ToyDataLoader:
             a = alpha
         else:
             a = np.ones_like(alpha)
-        return a[0] * row_embed[0] * col_embed[0] + \
-               a[1] * row_embed[0] * col_embed[1]
+
+        return np.dot(a[:self._embedding_size] * row_embed, col_embed)
 
 
     def _mixture_data(self, alpha, row_embed, col_embed):
         """Produce data values in a manner similar to _product_data, but doesn't imply that row_embed, col_embed are in same space."""
+
+        assert self._embedding_size == 2, 'This data process does not work with embedding size != 2'
+
         return alpha[0] * row_embed[0] * col_embed[0] + \
                alpha[1] * row_embed[0] * col_embed[1] + \
                alpha[2] * row_embed[1] * col_embed[0] + \

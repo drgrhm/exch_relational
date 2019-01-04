@@ -40,56 +40,56 @@ def sigmoid(x):
 def normalize(x):
     return (x - np.mean(x)) / np.std(x)
 
-def plot_feature(embeds, predicts, title, plot_name, item_name, sort=False):
+# def plot_feature(embeds, predicts, title, plot_name, item_name, sort=False):
+#
+#     assert embeds.shape == predicts.shape
+#
+#     n = embeds.shape[0]
+#
+#     if sort:
+#         score = np.zeros((n, 2))
+#         score[:,0] = embeds
+#         score[:,1] = predicts
+#         score.view('f8,f8').sort(order=['f0'], axis=0)
+#         embeds = score[:,0]
+#         predicts = score[:,1]
+#
+#     plt.title(title)
+#     plt.plot(range(n), embeds, '.-', color='blue')
+#     plt.plot(range(n), predicts, '.-', color='green')
+#     plt.xlabel(item_name)
+#     plt.ylabel('feature value')
+#     plt.legend(('embeddings', 'predictions'))
+#     plt.show()
+#     plt.savefig('img/' + plot_name + '.pdf', bbox_inches='tight')
+#     plt.clf()
+#
+# def plot_embeddings(embeds, predicts, title, plot_name, sort=False):
+#
+#     assert embeds.shape[1] == 2
+#     assert embeds.shape == predicts.shape
+#
+#     if sort:
+#         score = np.zeros((embeds.shape[0], 5))
+#         score[:,0] = embeds[:,0] * embeds[:,1]
+#         score[:,1:3] = embeds
+#         score[:,3:] = predicts
+#         score.view('f8,f8,f8,f8,f8').sort(order=['f0'], axis=0)
+#         embeds = score[:, 1:3]
+#         predicts = score[:, 3:]
+#
+#     plt.title(title)
+#     plt.plot(embeds[:,0], embeds[:,1], '.', color='blue')
+#     plt.plot(predicts[:,0], predicts[:,1], '.', color='green')
+#     plt.xlabel('feature 0')
+#     plt.ylabel('feature 1')
+#     plt.legend(('embeddings', 'predictions'))
+#     plt.show()
+#     plt.savefig(plot_name + '.pdf', bbox_inches='tight')
+#     plt.clf()
 
-    assert embeds.shape == predicts.shape
 
-    n = embeds.shape[0]
-
-    if sort:
-        score = np.zeros((n, 2))
-        score[:,0] = embeds
-        score[:,1] = predicts
-        score.view('f8,f8').sort(order=['f0'], axis=0)
-        embeds = score[:,0]
-        predicts = score[:,1]
-
-    plt.title(title)
-    plt.plot(range(n), embeds, '.-', color='blue')
-    plt.plot(range(n), predicts, '.-', color='green')
-    plt.xlabel(item_name)
-    plt.ylabel('feature value')
-    plt.legend(('embeddings', 'predictions'))
-    plt.show()
-    plt.savefig('img/' + plot_name + '.pdf', bbox_inches='tight')
-    plt.clf()
-
-def plot_embeddings(embeds, predicts, title, plot_name, sort=False):
-
-    assert embeds.shape[1] == 2
-    assert embeds.shape == predicts.shape
-
-    if sort:
-        score = np.zeros((embeds.shape[0], 5))
-        score[:,0] = embeds[:,0] * embeds[:,1]
-        score[:,1:3] = embeds
-        score[:,3:] = predicts
-        score.view('f8,f8,f8,f8,f8').sort(order=['f0'], axis=0)
-        embeds = score[:, 1:3]
-        predicts = score[:, 3:]
-
-    plt.title(title)
-    plt.plot(embeds[:,0], embeds[:,1], '.', color='blue')
-    plt.plot(predicts[:,0], predicts[:,1], '.', color='green')
-    plt.xlabel('feature 0')
-    plt.ylabel('feature 1')
-    plt.legend(('embeddings', 'predictions'))
-    plt.show()
-    plt.savefig(plot_name + '.pdf', bbox_inches='tight')
-    plt.clf()
-
-
-def plot_features(embeds, predicts, title, plot_name, sort=False, plot_rate=1.):
+def plot_embeddings(embeds, predicts, title, path, sort=False, plot_rate=1.):
 
     assert embeds.shape[1] == 2
     assert embeds.shape == predicts.shape
@@ -116,24 +116,25 @@ def plot_features(embeds, predicts, title, plot_name, sort=False, plot_rate=1.):
     plt.xlabel('feature 0')
     plt.ylabel('feature 1')
     plt.show()
-    plt.savefig('img/' + plot_name + '.pdf', bbox_inches='tight')
+    plt.savefig(path, bbox_inches='tight')
     plt.clf()
 
 
-def plot_loss(losses_tr, losses_vl, mean_tr, title, file_name):
+def plot_loss(losses_tr, losses_vl, mean_tr, title, path):
     n = len(losses_tr)
     plt.title(title)
     plt.xlabel('epoch')
     plt.ylabel('loss')
     plt.plot(range(n), losses_tr, '.-', color='blue')
     plt.plot(range(n), losses_vl, '.-', color='green')
+    # plt.plot(range(n), losses_ts, '.-', color='red')
     if mean_tr is not None:
-        plt.plot(range(n), mean_tr * np.ones(n), '-', color='red')
+        plt.plot(range(n), mean_tr * np.ones(n), '-', color='yellow')
         plt.legend(('training', 'validation', 'mean'))
     else:
         plt.legend(('training', 'validation'))
     plt.show()
-    plt.savefig('img/' + file_name + '.pdf', bbox_inches='tight')
+    plt.savefig(path, bbox_inches='tight')
     plt.clf()
 
 
@@ -144,3 +145,7 @@ def gaussian_embeddings(embedding_size, n_embeddings):
     embeds = np.random.multivariate_normal(means, np.diag(stds), size=n_embeddings)
     return embeds
 
+
+def np_rmse_loss(values_in, values_out, noise_mask):
+    diffs = ((values_in - values_out) ** 2) * noise_mask
+    return np.sqrt(np.sum(diffs) / np.sum(noise_mask))

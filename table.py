@@ -47,24 +47,24 @@ class Table:
             n_vl, n_ts = 0, 0
             split = np.zeros(n)
 
-        if num_features > 1:
-            # split = np.array([i for i in split for _ in range(num_features)])
-            # indices = expand_indices(indices, num_features)
-
-            if one_hot:  # TODO fix so generalizes better i.e. not just 3 features
-                new_vals = []
-                for val in values:
-                    if val > 0:
-                        new_vals.append([1, 0, 0])
-                    elif val < 0:
-                        new_vals.append([0, 0, 1])
-                    elif val == 0:
-                        new_vals.append([0, 1, 0])
-            else:
-                new_vals = np.array([[val, 0, 0] for val in values])
-
-            new_vals = np.reshape(np.array(new_vals), [-1])
-            values = new_vals
+        # if num_features > 1:
+        #     # split = np.array([i for i in split for _ in range(num_features)])
+        #     # indices = expand_indices(indices, num_features)
+        #
+        #     if one_hot:  # TODO fix so generalizes better i.e. not just 3 features
+        #         new_vals = []
+        #         for val in values:
+        #             if val > 0:
+        #                 new_vals.append([1, 0, 0])
+        #             elif val < 0:
+        #                 new_vals.append([0, 0, 1])
+        #             elif val == 0:
+        #                 new_vals.append([0, 1, 0])
+        #     else:
+        #         new_vals = np.array([[val, 0, 0] for val in values])
+        #
+        #     new_vals = np.reshape(np.array(new_vals), [-1])
+        #     values = new_vals
 
         self.tid = tid
         self._set_data_splits(indices, values, split, num_features)
