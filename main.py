@@ -471,7 +471,7 @@ if __name__ == "__main__":
     units_in = 1
     embedding_size_data = 2
     embedding_size_network = 2
-    units = 2
+    units = 128
     units_out = 1
 
     # activation = tf.nn.relu
@@ -483,7 +483,7 @@ if __name__ == "__main__":
     save_model = True
 
 
-    opts = {'epochs':10,
+    opts = {'epochs':1000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.6, .4, .0], # train, validation, test split
@@ -491,7 +491,7 @@ if __name__ == "__main__":
             'regularization_rate':.00001,
             'learning_rate':.0001,
             'evaluate_only':False, # If True, don't train the model, just evaluate it
-            'toy_data':{'size':[20, 10, 5],
+            'toy_data':{'size':[1500, 1000, 500],
                         'sparsity':.01,
                         'embedding_size':embedding_size_data,
                         'min_observed':2, # generate at least 2 entries per row and column (sparsity rate will be affected)
@@ -503,20 +503,20 @@ if __name__ == "__main__":
                           'layers':[
                                     {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
                                     {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':FeatureDropoutLayer, 'units_out':units},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units_out':units},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units_out':units},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units_out':units},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units_out':units},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units_out':units},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units_out':units},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    {'type':FeatureDropoutLayer, 'units_out':units},
                                     {'type':ExchangeableLayer, 'units_out':embedding_size_network,  'activation':None},
                                     {'type':PoolingLayer, 'units_out':embedding_size_network},
                                    ],
@@ -528,20 +528,20 @@ if __name__ == "__main__":
                               'layers': [
                                   {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
                                   {'type':FeatureDropoutLayer, 'units_out':units},
-                                  # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                  # {'type':FeatureDropoutLayer, 'units_out':units},
-                                  # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                  # {'type':FeatureDropoutLayer, 'units_out':units},
-                                  # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                  # {'type':FeatureDropoutLayer, 'units_out':units},
-                                  # {'type':ExchangeableLayer, 'units_out':units, 'activation': activation, 'skip_connections':skip_connections},
-                                  # {'type':FeatureDropoutLayer, 'units_out': units},
-                                  # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                  # {'type':FeatureDropoutLayer, 'units_out':units},
-                                  # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                  # {'type':FeatureDropoutLayer, 'units_out':units},
-                                  # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                  # {'type':FeatureDropoutLayer, 'units_out':units},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                  {'type':FeatureDropoutLayer, 'units_out':units},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                  {'type':FeatureDropoutLayer, 'units_out':units},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                  {'type':FeatureDropoutLayer, 'units_out':units},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation': activation, 'skip_connections':skip_connections},
+                                  {'type':FeatureDropoutLayer, 'units_out': units},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                  {'type':FeatureDropoutLayer, 'units_out':units},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                  {'type':FeatureDropoutLayer, 'units_out':units},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                  {'type':FeatureDropoutLayer, 'units_out':units},
                                   {'type':ExchangeableLayer, 'units_out':units_out, 'activation':None},
                           ],
                          },
