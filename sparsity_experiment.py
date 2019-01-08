@@ -3,40 +3,8 @@ import numpy as np
 from main import main
 from layers import ExchangeableLayer, FeatureDropoutLayer, PoolingLayer
 from data_util import ToyDataLoader
-from util import gaussian_embeddings, np_rmse_loss
-
-
-
-def _update_observed(observed_old, p_keep, min_observed):
-
-    inds_sc = np.array(np.nonzero(observed_old)).T
-
-    n_keep = int(p_keep * inds_sc.shape[0])
-    n_drop = inds_sc.shape[0] - n_keep
-
-    inds_sc_keep = np.concatenate( (np.ones(n_keep), np.zeros(n_drop)) )
-    np.random.shuffle(inds_sc_keep)
-    inds_sc = inds_sc[inds_sc_keep == 1, :]
-
-    observed_new = np.zeros_like(observed_old)
-    observed_new[inds_sc[:,0], inds_sc[:,1]] = 1
-
-    shape = observed_new.shape
-    rows = np.sum(observed_new, axis=1)
-    for i in np.array(range(shape[0]))[rows < min_observed]:
-        diff = observed_old[i, :] - observed_new[i, :]
-        resample_inds = np.array(range(shape[1]))[diff == 1]
-        jj = np.random.choice(resample_inds, int(min_observed - rows[i]), replace=False)
-        observed_new[i, jj] = 1
-
-    cols = np.sum(observed_new, axis=0)
-    for j in np.array(range(shape[1]))[cols < min_observed]:
-        diff = observed_old[:, j] - observed_new[:, j]
-        resample_inds = np.array(range(shape[0]))[diff == 1]
-        ii = np.random.choice(resample_inds, int(min_observed - cols[j]), replace=False)
-        observed_new[ii, j] = 1
-
-    return observed_new
+from util import gaussian_embeddings, np_rmse_loss, update_observed
+import tensorflow as tf
 
 
 if __name__ == "__main__":
@@ -44,12 +12,12 @@ if __name__ == "__main__":
     data_set = 'toy'
     units_in = 1
     embedding_size_data = 2
-    embedding_size_network = 8
-    units = 36
+    embedding_size_network = 16
+    units = 128
     units_out = 1
 
     # activation = tf.nn.relu
-    activation = None
+    activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
     dropout_rate = 0.2
     skip_connections = True
 
@@ -130,12 +98,13 @@ if __name__ == "__main__":
                 # 'seed': 9870112,
                 }
 
-
-
     np.random.seed(9873866)
 
-    percent_observed = [1., .8, .5, .2, .1] # Must be decreasing
-    percent_training = [.8, .7, .6, .5, .4]
+    percent_observed = [1., .5, .4, .3, .2, .1] # Must be decreasing
+    percent_training = [.9, .8, .7, .6, .5]
+
+    # percent_observed = [1., .5, .4, .3, .2, .1]  # Must be decreasing
+    # percent_training = [.9, .8, .7, .6, .5]
 
     embeddings = {}
     embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
@@ -157,15 +126,19 @@ if __name__ == "__main__":
         p_keep = p / p_prev
 
         observed.append({})
-        observed[i]['sc'] = _update_observed(observed[i-1]['sc'], p_keep, opts['toy_data']['min_observed'])
-        observed[i]['sp'] = _update_observed(observed[i-1]['sp'], p_keep, opts['toy_data']['min_observed'])
-        observed[i]['cp'] = _update_observed(observed[i-1]['cp'], p_keep, opts['toy_data']['min_observed'])
+        observed[i]['sc'] = update_observed(observed[i-1]['sc'], p_keep, opts['toy_data']['min_observed'])
+        observed[i]['sp'] = update_observed(observed[i-1]['sp'], p_keep, opts['toy_data']['min_observed'])
+        observed[i]['cp'] = update_observed(observed[i-1]['cp'], p_keep, opts['toy_data']['min_observed'])
 
     percent_observed = percent_observed[1:] # remove 1.0 from list, since some data must be unobserved to make predictions
     observed = observed[1:] # remove corresponding matrix
 
     checkpoints_folder = opts['checkpoints_folder']
     os.mkdir(checkpoints_folder + '/sparsity_experiment')
+
+
+    loss_ts = np.zeros((len(percent_observed), len(percent_training)))
+    loss_mean = np.zeros((len(percent_observed), len(percent_training)))
 
     for i, p in enumerate(percent_observed):
         for j, q in enumerate(percent_training):
@@ -183,14 +156,15 @@ if __name__ == "__main__":
                                          alpha=alpha,
                                          observed=observed[i])
 
+            mean_tr = np.mean(opts['data'].tables['student_course'].values_tr)
+            split_tr = opts['data'].tables['student_course'].split[opts['data'].tables['student_course'].split <= 1]
+            loss_mean[i, j] = np_rmse_loss(opts['data'].tables['student_course'].values_all, mean_tr * np.ones_like(opts['data'].tables['student_course'].values_all), split_tr)  # Loss when predicting training mean
+
             opts['checkpoints_folder'] = checkpoints_folder + '/sparsity_experiment/' + str(i) + '-' + str(j)
             os.mkdir(opts['checkpoints_folder'])
             opts['save_model'] = True
 
             main(opts)
-
-    loss_ts = np.zeros((len(percent_observed), len(percent_training)))
-    loss_mean = np.zeros((len(percent_observed), len(percent_training)))
 
     for i, p in enumerate(percent_observed):
         for j, q in enumerate(percent_training):
@@ -215,7 +189,7 @@ if __name__ == "__main__":
             restore_point = opts['checkpoints_folder'] + '/best.ckpt'
             opts['evaluate_only'] = True
 
-            loss_ts[i,j], loss_mean[i,j] = main(opts, restore_point)
+            loss_ts[i,j] = main(opts, restore_point)
 
             path = os.path.join(opts['checkpoints_folder'], 'loss.npz')
             file = open(path, 'wb')

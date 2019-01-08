@@ -109,15 +109,26 @@ def plot_embeddings(embeds, predicts, title, path, sort=False, plot_rate=1.):
         predicts = predicts[mask == 1, :]
 
     plt.title(title)
-    s = 30 * sigmoid(normalize(embeds[:,0]))
-    c = sigmoid(normalize([embeds.shape[0] - i for i in embeds[:,1]]))
-    plt.scatter(predicts[:,0], predicts[:,1], s=s, c=c)
-    # plt.scatter(sigmoid(normalize(predicts[:, 0])), sigmoid(normalize(predicts[:, 1])), s=s, c=c)
-    plt.xlabel('feature 0')
-    plt.ylabel('feature 1')
+    # plt.locator_params(axis='x', nbins=5)
+    # plt.locator_params(axis='y', nbins=5)
+    s = 10 + 10 * np.exp(normalize(embeds[:, 0]))
+    c = sigmoid(normalize(embeds[:, 1]))
+    # s = 30 * normalize(embeds[:, 0])
+    # c = normalize(embeds[:, 1])
+    plt.scatter(predicts[:,0], predicts[:,1], s=s, c=c, cmap='plasma', alpha=.5)
+    plt.xlabel('embedding[0]')
+    plt.ylabel('embedding[1]')
     plt.show()
     plt.savefig(path, bbox_inches='tight')
     plt.clf()
+
+
+# def make_embeddings_plot(embeddings_data):
+#     # plot_embeddings(embeds_data['student_embeds_in'], np.squeeze(embeds_data['student_embeds_out_vl_best']), 'Student embeddings', image_path + 'student_embeddings.pdf')
+#     plt.subplot(1, 3, 1)
+#     s = 10 * np.exp(normalize(embeddings_data['student_embeds_in'][:, 0]))
+#     c = sigmoid(normalize(embeddings_data['student_embeds_in'][:, 1]))
+#     plt.scatter(predicts[:, 0], predicts[:, 1], s=s, c=c, alpha=.7)
 
 
 def plot_loss(losses_tr, losses_vl, mean_tr, title, path):
@@ -149,3 +160,55 @@ def gaussian_embeddings(embedding_size, n_embeddings):
 def np_rmse_loss(values_in, values_out, noise_mask):
     diffs = ((values_in - values_out) ** 2) * noise_mask
     return np.sqrt(np.sum(diffs) / np.sum(noise_mask))
+
+
+def update_observed(observed_old, p_keep, min_observed):
+
+    inds_sc = np.array(np.nonzero(observed_old)).T
+
+    n_keep = int(p_keep * inds_sc.shape[0])
+    n_drop = inds_sc.shape[0] - n_keep
+
+    inds_sc_keep = np.concatenate( (np.ones(n_keep), np.zeros(n_drop)) )
+    np.random.shuffle(inds_sc_keep)
+    inds_sc = inds_sc[inds_sc_keep == 1, :]
+
+    observed_new = np.zeros_like(observed_old)
+    observed_new[inds_sc[:,0], inds_sc[:,1]] = 1
+
+    shape = observed_new.shape
+    rows = np.sum(observed_new, axis=1)
+    for i in np.array(range(shape[0]))[rows < min_observed]:
+        diff = observed_old[i, :] - observed_new[i, :]
+        resample_inds = np.array(range(shape[1]))[diff == 1]
+        jj = np.random.choice(resample_inds, int(min_observed - rows[i]), replace=False)
+        observed_new[i, jj] = 1
+
+    cols = np.sum(observed_new, axis=0)
+    for j in np.array(range(shape[1]))[cols < min_observed]:
+        diff = observed_old[:, j] - observed_new[:, j]
+        resample_inds = np.array(range(shape[0]))[diff == 1]
+        ii = np.random.choice(resample_inds, int(min_observed - cols[j]), replace=False)
+        observed_new[ii, j] = 1
+
+    return observed_new
+
+
+def choose_observed(tid, shape, sparsity, min_observed=1):
+    """Which entries of the matrix to consider as observed."""
+
+    obs = np.random.choice([0,1], shape, p=(1-sparsity, sparsity))
+
+    rows = np.sum(obs, axis=1)
+    for i in  np.array(range(shape[0]))[rows < min_observed]:
+        jj = np.random.choice(range(shape[1]), min_observed, replace=False)
+        obs[i, jj] = 1
+
+    cols = np.sum(obs, axis=0)
+    for j in  np.array(range(shape[1]))[cols < min_observed]:
+        ii = np.random.choice(range(shape[0]), min_observed, replace=False)
+        obs[ii, j] = 1
+
+    print("final density of observed values in table ", tid,  ": ", np.sum(obs) / (shape[0] * shape[1]))
+
+    return obs

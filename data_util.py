@@ -177,7 +177,7 @@ class ToyDataLoader:
                 tab[i, j] = self._product_data(alpha, row_embeds[i, :], col_embeds[j, :])
 
         if observed is None:
-            observed = self._choose_observed(tid, shape, min_observed=self._min_observed)
+            observed = choose_observed(tid, shape, self._sparsity, min_observed=self._min_observed)
 
         inds = np.array(np.nonzero(observed)).T
         vals = tab.flatten()[observed.flatten() == 1]
@@ -185,27 +185,7 @@ class ToyDataLoader:
         return Table(tid, inds, vals, shape, self._split_sizes, num_features=self._num_features, embeddings=self.embeddings)
 
 
-    def _choose_observed(self, tid, shape, min_observed=1):
-        """Which entries of the matrix to consider as observed."""
-
-        obs = np.random.choice([0,1], shape, p=(1-self._sparsity, self._sparsity))
-
-        rows = np.sum(obs, axis=1)
-        for i in  np.array(range(shape[0]))[rows < min_observed]:
-            jj = np.random.choice(range(shape[1]), min_observed, replace=False)
-            obs[i, jj] = 1
-
-        cols = np.sum(obs, axis=0)
-        for j in  np.array(range(shape[1]))[cols < min_observed]:
-            ii = np.random.choice(range(shape[0]), min_observed, replace=False)
-            obs[ii, j] = 1
-
-        print("final density of observed values in table ", tid,  ": ", np.sum(obs) / (shape[0] * shape[1]))
-
-        return obs
-
-
-    def _product_data(self, alpha, row_embed, col_embed, weighted=True):
+    def _product_data(self, alpha, row_embed, col_embed, weighted=False):
         """Produce data values by a (weighted) inner product of row and column embeddings."""
         if weighted:
             a = alpha
