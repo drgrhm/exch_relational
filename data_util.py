@@ -156,7 +156,7 @@ class ToyDataLoader:
         table_sp = self._make_table(embeds_s, embeds_p, tid=1, observed=self._observed['sp'], alpha=self._alpha['sp'])
         table_cp = self._make_table(embeds_c, embeds_p, tid=2, observed=self._observed['cp'], alpha=self._alpha['cp'])
 
-        return {'student_course': table_sc, 'student_prof':table_sp, 'course_prof':table_cp}
+        return {'student_course':table_sc, 'student_prof':table_sp, 'course_prof':table_cp}
 
 
     def _make_table(self, row_embeds, col_embeds, tid, observed=None, alpha=None):

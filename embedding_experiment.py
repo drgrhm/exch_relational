@@ -95,7 +95,7 @@ if __name__ == "__main__":
             # 'seed': 9870112,
             }
 
-    np.random.seed(9870112)
+    np.random.seed(9858776)
     seeds = np.random.randint(low=0, high=1000000, size=3)
 
     for seed in seeds:

@@ -27,7 +27,7 @@ if __name__ == "__main__":
     opts = {'epochs':1000,
                 'data_folder':'data',
                 'data_set':data_set,
-                'split_sizes':[.9, .1, .0], # train, validation, test split
+                'split_sizes':[.8, .2, .0], # train, validation, test split
                 'noise_rate':dropout_rate,
                 'regularization_rate':.00001,
                 'learning_rate':.0001,
@@ -94,17 +94,17 @@ if __name__ == "__main__":
                 'save_frequency':100, # Save model every save_frequency epochs
                 'loss_save_tolerance':.0, # If loss changes by more than loss_save_tolerance (as % of old value), save the model
                 'debug':True, # Set random seeds or not
-                'seed':9858776,
-                # 'seed': 9870112,
+                # 'seed':9858776,
+                'seed': 9870112,
                 }
 
-    np.random.seed(9873866)
+    np.random.seed(9858776)
 
-    percent_observed = [1., .5, .4, .3, .2, .1] # Must be decreasing
-    percent_training = [.9, .8, .7, .6, .5]
-
-    # percent_observed = [1., .5, .4, .3, .2, .1]  # Must be decreasing
+    # percent_observed = [1., .5, .4, .3, .2, .1] # Must be decreasing
     # percent_training = [.9, .8, .7, .6, .5]
+
+    percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1]  # Must be decreasing
+    percent_training = [.9, .8, .7]
 
     embeddings = {}
     embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])

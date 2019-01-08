@@ -7,6 +7,7 @@ class Model:
         
         pool_mode = kwargs.get('pool_mode', None)
         dropout_rate = kwargs.get('dropout_rate', None)
+        side_info = kwargs.get('side_info', True)
         layers = kwargs['layers']
         self.num_layers = len(layers)
         self.layers = {}
@@ -26,6 +27,7 @@ class Model:
                                               skip_connections=skip_connections,
                                               output_embeddings=output_embeddings,
                                               embedding_size = embedding_size,
+                                              side_info=side_info,
                                               scope=name)
             units_in = units_out
 

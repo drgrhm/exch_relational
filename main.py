@@ -261,28 +261,29 @@ def main(opts, restore_point=None):
 
 
 
-            # ## Testing
-            # split_ts = 1. * (data.tables['student_course'].split == 2)
-            # vals_ts = data.tables['student_course'].values_all * (split_ts == 0)
-            #
-            # ts_dict = {student_course['indices']:data.tables['student_course'].indices_all,
-            #            student_course['values']:data.tables['student_course'].values_all,  # values used when calculating loss
-            #            student_course['noise_mask']:split_ts,
-            #            student_course['values_noisy']:vals_ts,  # values used for making predictions
-            #            student_prof['indices']:data.tables['student_prof'].indices_all,
-            #            student_prof['values']:data.tables['student_prof'].values_all,
-            #            course_prof['indices']:data.tables['course_prof'].indices_all,
-            #            course_prof['values']:data.tables['course_prof'].values_all,
-            #            }
-            #
-            # loss_ts, student_embeds_out_ts, course_embeds_out_ts, prof_embeds_out_ts = sess.run([rec_loss_vl,
-            #                                                                                      encoder_out_vl['student_course']['row_embeds'],
-            #                                                                                      encoder_out_vl['student_course']['col_embeds'],
-            #                                                                                      encoder_out_vl['student_prof']['col_embeds']], feed_dict=ts_dict)
-            # losses_ts.append(loss_ts)
+            ## Testing
+            if opts['split_sizes'][2] > 0:
+                split_ts = 1. * (data.tables['student_course'].split == 2)
+                vals_ts = data.tables['student_course'].values_all * (split_ts == 0)
 
-            ## TODO: remove:
-            loss_ts = 0
+                ts_dict = {student_course['indices']:data.tables['student_course'].indices_all,
+                           student_course['values']:data.tables['student_course'].values_all,  # values used when calculating loss
+                           student_course['noise_mask']:split_ts,
+                           student_course['values_noisy']:vals_ts,  # values used for making predictions
+                           student_prof['indices']:data.tables['student_prof'].indices_all,
+                           student_prof['values']:data.tables['student_prof'].values_all,
+                           course_prof['indices']:data.tables['course_prof'].indices_all,
+                           course_prof['values']:data.tables['course_prof'].values_all,
+                           }
+
+                loss_ts, student_embeds_out_ts, course_embeds_out_ts, prof_embeds_out_ts = sess.run([rec_loss_vl,
+                                                                                                     encoder_out_vl['student_course']['row_embeds'],
+                                                                                                     encoder_out_vl['student_course']['col_embeds'],
+                                                                                                     encoder_out_vl['student_prof']['col_embeds']], feed_dict=ts_dict)
+            else:
+                loss_ts = 0
+
+            losses_ts.append(loss_ts)
 
             if loss_vl < loss_vl_best:
                 # loss_improvement = (loss_vl_best - loss_vl) / loss_vl_best

@@ -89,7 +89,7 @@ def normalize(x):
 #     plt.clf()
 
 
-def plot_embeddings(embeds, predicts, title, path, sort=False, plot_rate=1.):
+def plot_embeddings(embeds, predicts, title, path, sort=False, plot_rate=1., remove_outliers=False):
 
     assert embeds.shape[1] == 2
     assert embeds.shape == predicts.shape
@@ -107,6 +107,20 @@ def plot_embeddings(embeds, predicts, title, path, sort=False, plot_rate=1.):
         mask = np.random.choice((0,1), size=embeds.shape[0], replace=True, p=(1-plot_rate, plot_rate))
         embeds = embeds[mask == 1,:]
         predicts = predicts[mask == 1, :]
+
+    if remove_outliers:
+        mean_x = np.mean(predicts[:, 0])
+        std_x = np.std(predicts[:, 0])
+        nonoutliers_x = np.abs(predicts[:, 0] - mean_x) < 2 * std_x
+
+        mean_y = np.mean(predicts[:, 1])
+        std_y = np.std(predicts[:, 1])
+        nonoutliers_y = np.abs(predicts[:, 1] - mean_y) < 2 * std_y
+
+        nonoutliers = [nonoutliers_x[i] and nonoutliers_y[i] for i in range(embeds.shape[0])]
+
+        embeds = embeds[nonoutliers, :]
+        predicts = predicts[nonoutliers, :]
 
     plt.title(title)
     # plt.locator_params(axis='x', nbins=5)
