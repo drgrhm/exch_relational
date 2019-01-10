@@ -41,6 +41,7 @@ if __name__ == "__main__":
                               'dropout_rate':dropout_rate,
                               'units_in':units_in,
                               'units_out':units_out,
+                              'variational':False,
                               'layers':[
                                         {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
                                         {'type':FeatureDropoutLayer, 'units_out':units},
@@ -66,6 +67,7 @@ if __name__ == "__main__":
                                  'dropout_rate':dropout_rate,
                                  'units_in':embedding_size_network,
                                  'units_out':units_out,
+                                 'variational':False,
                                   'layers': [
                                       {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
                                       {'type':FeatureDropoutLayer, 'units_out':units},
@@ -103,7 +105,7 @@ if __name__ == "__main__":
     # percent_observed = [1., .5, .4, .3, .2, .1] # Must be decreasing
     # percent_training = [.9, .8, .7, .6, .5]
 
-    percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1]  # Must be decreasing
+    percent_observed = [1., .9, .85, .8, .75, .7, .65, .6, .55, .5]  # Must be decreasing
     percent_training = [.9, .8, .7]
 
     embeddings = {}

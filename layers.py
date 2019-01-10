@@ -139,11 +139,10 @@ class ExchangeableLayer(Layer):
         self.pool_mode = kwargs['pool_mode']
         self.activation = kwargs['activation']
         self.skip_connections = kwargs.get('skip_connections', False)
-        # self.output_embeddings = kwargs.get('output_embeddings', False)
-        self.embedding_size = kwargs.get('embedding_size', 2)
         self.scope = kwargs['scope']
         self.params = {}
         self._side_info = kwargs.get('side_info', True)
+        self._variational = kwargs['variational']
 
 
     def get_output(self, tables, reuse=None, is_training=True):
@@ -163,6 +162,22 @@ class ExchangeableLayer(Layer):
 
 
             if student_embeds is not None and course_embeds is not None and prof_embeds is not None:
+
+
+                # if self._variational:
+                #     student_embeds = tf.squeeze(student_embeds)
+                #     course_embeds = tf.squeeze(course_embeds)
+                #     prof_embeds = tf.squeeze(prof_embeds)
+                #
+                #     student_embeds = tf.random_normal((tf.shape(student_embeds)[0], self.units_in), mean=student_embeds[:, 0:2], stddev=student_embeds[:, 2:4])
+                #     course_embeds = tf.random_normal((tf.shape(course_embeds)[0], self.units_in), mean=course_embeds[:, 0:2], stddev=course_embeds[:, 2:4])
+                #     prof_embeds = tf.random_normal((tf.shape(prof_embeds)[0], self.units_in), mean=prof_embeds[:, 0:2], stddev=prof_embeds[:, 2:4])
+                #
+                #     student_embeds = tf.expand_dims(student_embeds, axis=1)
+                #     course_embeds = tf.expand_dims(course_embeds, axis=0)
+                #     prof_embeds = tf.expand_dims(prof_embeds, axis=0)
+
+
 
                 ## student_course
                 params['theta_sc_row_embed'] = tf.get_variable(name='theta_sc_row_embed', shape=[units_in, units_out])

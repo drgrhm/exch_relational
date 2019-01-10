@@ -8,10 +8,17 @@ if __name__ == "__main__":
 
     data_set = 'toy'
     units_in = 1
-    embedding_size_data = 2
-    embedding_size_network = 2
     units = 128
     units_out = 1
+
+    variational = False
+    embedding_size_data = 2
+    embedding_size_decoder = 2
+    if variational:
+        embedding_size_encoder = 2 * embedding_size_decoder
+    else:
+        embedding_size_encoder = 2
+
 
     # activation = tf.nn.relu
     activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
@@ -21,7 +28,7 @@ if __name__ == "__main__":
     auto_restore = False
     save_model = True
 
-    opts = {'epochs':2000,
+    opts = {'epochs':1000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1],  # train, validation, test split
@@ -38,6 +45,7 @@ if __name__ == "__main__":
                             'dropout_rate':dropout_rate,
                             'units_in':units_in,
                             'units_out':units_out,
+                            'variational':variational,
                             'layers':[
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
@@ -55,14 +63,15 @@ if __name__ == "__main__":
                                 {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
-                                {'type':ExchangeableLayer, 'units_out':embedding_size_network, 'activation':None},
-                                {'type':PoolingLayer, 'units_out':embedding_size_network},
+                                {'type':ExchangeableLayer, 'units_out':embedding_size_encoder, 'activation':None},
+                                {'type':PoolingLayer, 'units_out':embedding_size_encoder},
                             ],
                             },
             'decoder_opts':{'pool_mode':'mean',
                             'dropout_rate':dropout_rate,
-                            'units_in':embedding_size_network,
+                            'units_in':embedding_size_decoder,
                             'units_out':units_out,
+                            'variational':variational,
                             'layers':[
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
@@ -96,7 +105,7 @@ if __name__ == "__main__":
             }
 
     np.random.seed(9858776)
-    seeds = np.random.randint(low=0, high=1000000, size=3)
+    seeds = np.random.randint(low=0, high=1000000, size=10)
 
     for seed in seeds:
 
