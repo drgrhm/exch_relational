@@ -126,7 +126,7 @@ class ToyDataLoader:
             self._observed = observed
             self._alpha = alpha
 
-        # assert embedding_size == 2, 'Currently only embedding size of 2 is supported'
+        assert embedding_size == 2, 'Currently only embedding size of 2 is supported'
 
         self._sparsity = sparsity
 
@@ -156,7 +156,7 @@ class ToyDataLoader:
         table_sp = self._make_table(embeds_s, embeds_p, tid=1, observed=self._observed['sp'], alpha=self._alpha['sp'])
         table_cp = self._make_table(embeds_c, embeds_p, tid=2, observed=self._observed['cp'], alpha=self._alpha['cp'])
 
-        return {'student_course':table_sc, 'student_prof':table_sp, 'course_prof':table_cp}
+        return {'student_course': table_sc, 'student_prof':table_sp, 'course_prof':table_cp}
 
 
     def _make_table(self, row_embeds, col_embeds, tid, observed=None, alpha=None):
@@ -167,22 +167,43 @@ class ToyDataLoader:
         tab = np.zeros((n_rows, n_cols))
 
         if alpha is None:
-            num_alpha = max(4, self._embedding_size)
-            alpha = 2 * np.random.randn(num_alpha)
+            alpha = 2 * np.random.randn(4)
 
-
-        for i in range(n_rows):
-            for j in range(n_cols):
-                # tab[i, j] = self._mixture_data(alpha, row_embeds[i, :], col_embeds[j, :])
-                tab[i, j] = self._product_data(alpha, row_embeds[i, :], col_embeds[j, :])
+        if self._embedding_size == 2:
+            for i in range(n_rows):
+                for j in range(n_cols):
+                    # tab[i, j] = self._mixture_data(alpha, row_embeds[i, :], col_embeds[j, :])
+                    tab[i, j] = self._product_data(alpha, row_embeds[i, :], col_embeds[j, :])
+        else:
+            raise Exception('invalid embedding size')
 
         if observed is None:
-            observed = choose_observed(tid, shape, self._sparsity, min_observed=self._min_observed)
+            observed = self._choose_observed(tid, shape, min_observed=self._min_observed)
 
         inds = np.array(np.nonzero(observed)).T
         vals = tab.flatten()[observed.flatten() == 1]
 
         return Table(tid, inds, vals, shape, self._split_sizes, num_features=self._num_features, embeddings=self.embeddings)
+
+
+    def _choose_observed(self, tid, shape, min_observed=1):
+        """Which entries of the matrix to consider as observed."""
+
+        obs = np.random.choice([0,1], shape, p=(1-self._sparsity, self._sparsity))
+
+        rows = np.sum(obs, axis=1)
+        for i in  np.array(range(shape[0]))[rows < min_observed]:
+            jj = np.random.choice(range(shape[1]), min_observed, replace=False)
+            obs[i, jj] = 1
+
+        cols = np.sum(obs, axis=0)
+        for j in  np.array(range(shape[1]))[cols < min_observed]:
+            ii = np.random.choice(range(shape[0]), min_observed, replace=False)
+            obs[ii, j] = 1
+
+        print("final density of observed values in table ", tid,  ": ", np.sum(obs) / (shape[0] * shape[1]))
+
+        return obs
 
 
     def _product_data(self, alpha, row_embed, col_embed, weighted=False):
@@ -191,15 +212,12 @@ class ToyDataLoader:
             a = alpha
         else:
             a = np.ones_like(alpha)
-
-        return np.dot(a[:self._embedding_size] * row_embed, col_embed)
+        return a[0] * row_embed[0] * col_embed[0] + \
+               a[1] * row_embed[1] * col_embed[1]
 
 
     def _mixture_data(self, alpha, row_embed, col_embed):
         """Produce data values in a manner similar to _product_data, but doesn't imply that row_embed, col_embed are in same space."""
-
-        assert self._embedding_size == 2, 'This data process does not work with embedding size != 2'
-
         return alpha[0] * row_embed[0] * col_embed[0] + \
                alpha[1] * row_embed[0] * col_embed[1] + \
                alpha[2] * row_embed[1] * col_embed[0] + \

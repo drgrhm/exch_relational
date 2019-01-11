@@ -9,7 +9,7 @@ class Model:
         dropout_rate = kwargs.get('dropout_rate', None)
         side_info = kwargs.get('side_info', True)
         layers = kwargs['layers']
-        variational = kwargs['variational']
+        # variational = kwargs['variational']
         self.num_layers = len(layers)
         self.layers = {}
         units_in = kwargs['units_in']
@@ -25,7 +25,7 @@ class Model:
                                               activation=activation,
                                               skip_connections=skip_connections,
                                               side_info=side_info,
-                                              variational=variational,
+                                              # variational=variational,
                                               scope=name)
             units_in = units_out
 

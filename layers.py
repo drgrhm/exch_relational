@@ -14,9 +14,6 @@ class Layer:
     ## Produces a sparse tensor with the same shape as x_sp, and non-zero values corresponding to those of x_sp
     def broadcast_add_marginal(self, table_values, marginal, indices, axis=None):
 
-        if tf.shape(table_values)[0] == 0:
-            return 0
-
         # TODO refactor 2 cases into 1
         units_out = self.units_out
         inds = self.expand_tensor_indices(indices, units_out)
@@ -66,7 +63,7 @@ class Layer:
                 out = tf.unsorted_segment_sum(vals, inds, num_segments=num_segments)                
                 if keep_dims:
                     out = tf.expand_dims(out, axis=0)
-                out = out / count
+                out = out / count                
             elif pool_mode == 'max':
                 out = tf.unsorted_segment_max(vals, inds, num_segments=num_segments)
                 if keep_dims:
@@ -98,8 +95,6 @@ class Layer:
 
         if pool_mode == 'max': ## Hack to avoid large negative number. How to deal with max over no entries? 
             out = tf.where(tf.greater(out, -200000000), out, tf.zeros_like(out))
-        if count == 0:
-            return 0
         return out
 
 
@@ -139,10 +134,10 @@ class ExchangeableLayer(Layer):
         self.pool_mode = kwargs['pool_mode']
         self.activation = kwargs['activation']
         self.skip_connections = kwargs.get('skip_connections', False)
+        # self.output_embeddings = kwargs.get('output_embeddings', False)
+        self.embedding_size = kwargs.get('embedding_size', 2)
         self.scope = kwargs['scope']
         self.params = {}
-        self._side_info = kwargs.get('side_info', True)
-        self._variational = kwargs['variational']
 
 
     def get_output(self, tables, reuse=None, is_training=True):
@@ -163,27 +158,11 @@ class ExchangeableLayer(Layer):
 
             if student_embeds is not None and course_embeds is not None and prof_embeds is not None:
 
-
-                # if self._variational:
-                #     student_embeds = tf.squeeze(student_embeds)
-                #     course_embeds = tf.squeeze(course_embeds)
-                #     prof_embeds = tf.squeeze(prof_embeds)
-                #
-                #     student_embeds = tf.random_normal((tf.shape(student_embeds)[0], self.units_in), mean=student_embeds[:, 0:2], stddev=student_embeds[:, 2:4])
-                #     course_embeds = tf.random_normal((tf.shape(course_embeds)[0], self.units_in), mean=course_embeds[:, 0:2], stddev=course_embeds[:, 2:4])
-                #     prof_embeds = tf.random_normal((tf.shape(prof_embeds)[0], self.units_in), mean=prof_embeds[:, 0:2], stddev=prof_embeds[:, 2:4])
-                #
-                #     student_embeds = tf.expand_dims(student_embeds, axis=1)
-                #     course_embeds = tf.expand_dims(course_embeds, axis=0)
-                #     prof_embeds = tf.expand_dims(prof_embeds, axis=0)
-
-
-
                 ## student_course
-                params['theta_sc_row_embed'] = tf.get_variable(name='theta_sc_row_embed', shape=[units_in, units_out])
-                params['theta_sc_col_embed'] = tf.get_variable(name='theta_sc_col_embed', shape=[units_in, units_out])
-                params['theta_sc_row_embed_pool'] = tf.get_variable(name='theta_sc_row_embed_pool', shape=[units_in, units_out])
-                params['theta_sc_col_embed_pool'] = tf.get_variable(name='theta_sc_col_embed_pool', shape=[units_in, units_out])
+                params['theta_sc_row_embed'] = tf.get_variable(name='theta_sc_row_embed', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sc_col_embed'] = tf.get_variable(name='theta_sc_col_embed', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sc_row_embed_pool'] = tf.get_variable(name='theta_sc_row_embed_pool', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sc_col_embed_pool'] = tf.get_variable(name='theta_sc_col_embed_pool', shape=[units_in, units_out], trainable=is_training)
 
                 student_course_vals_row = tf.tensordot(student_embeds, params['theta_sc_row_embed'], axes=1) # [N_students x 1 x units_out]
                 student_course_vals_col = tf.tensordot(course_embeds, params['theta_sc_col_embed'], axes=1)  # [1 x N_courses x units_out]
@@ -197,10 +176,10 @@ class ExchangeableLayer(Layer):
                 student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_col_pool, student_course['indices'], axis=None)
 
                 ## student_prof
-                params['theta_sp_row_embed'] = tf.get_variable(name='theta_sp_row_embed', shape=[units_in, units_out])
-                params['theta_sp_col_embed'] = tf.get_variable(name='theta_sp_col_embed', shape=[units_in, units_out])
-                params['theta_sp_row_embed_pool'] = tf.get_variable(name='theta_sp_row_embed_pool', shape=[units_in, units_out])
-                params['theta_sp_col_embed_pool'] = tf.get_variable(name='theta_sp_col_embed_pool', shape=[units_in, units_out])
+                params['theta_sp_row_embed'] = tf.get_variable(name='theta_sp_row_embed', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sp_col_embed'] = tf.get_variable(name='theta_sp_col_embed', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sp_row_embed_pool'] = tf.get_variable(name='theta_sp_row_embed_pool', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sp_col_embed_pool'] = tf.get_variable(name='theta_sp_col_embed_pool', shape=[units_in, units_out], trainable=is_training)
 
                 student_prof_vals_row = tf.tensordot(student_embeds, params['theta_sp_row_embed'], axes=1)  # [N_students x 1 x units_out]
                 student_prof_vals_col = tf.tensordot(prof_embeds, params['theta_sp_col_embed'], axes=1)  # [1 x N_profs x units_out]
@@ -215,10 +194,10 @@ class ExchangeableLayer(Layer):
 
 
                 ## course_prof
-                params['theta_cp_row_embed'] = tf.get_variable(name='theta_cp_row_embed', shape=[units_in, units_out])
-                params['theta_cp_col_embed'] = tf.get_variable(name='theta_cp_col_embed', shape=[units_in, units_out])
-                params['theta_cp_row_embed_pool'] = tf.get_variable(name='theta_cp_row_embed_pool', shape=[units_in, units_out])
-                params['theta_cp_col_embed_pool'] = tf.get_variable(name='theta_cp_col_embed_pool', shape=[units_in, units_out])
+                params['theta_cp_row_embed'] = tf.get_variable(name='theta_cp_row_embed', shape=[units_in, units_out], trainable=is_training)
+                params['theta_cp_col_embed'] = tf.get_variable(name='theta_cp_col_embed', shape=[units_in, units_out], trainable=is_training)
+                params['theta_cp_row_embed_pool'] = tf.get_variable(name='theta_cp_row_embed_pool', shape=[units_in, units_out], trainable=is_training)
+                params['theta_cp_col_embed_pool'] = tf.get_variable(name='theta_cp_col_embed_pool', shape=[units_in, units_out], trainable=is_training)
 
                 course_embeds = tf.expand_dims(tf.squeeze(course_embeds), 1)
                 course_prof_vals_row = tf.tensordot(course_embeds, params['theta_cp_row_embed'], axes=1)  # [N_courses x 1 x units_out]
@@ -234,32 +213,32 @@ class ExchangeableLayer(Layer):
 
             else:
                 ## Params
-                params['theta_sc_sel'] = tf.get_variable(name='theta_sc_sel', shape=[units_in, units_out])
-                params['theta_sc_row'] = tf.get_variable(name='theta_sc_row', shape=[units_in, units_out])
-                params['theta_sc_col'] = tf.get_variable(name='theta_sc_col', shape=[units_in, units_out])
-                params['theta_sc_all'] = tf.get_variable(name='theta_sc_all', shape=[units_in, units_out])
-                params['theta_sc_sp_col'] = tf.get_variable(name='theta_sc_sp_col', shape=[units_in, units_out])
-                params['theta_sc_sp_all'] = tf.get_variable(name='theta_sc_sp_all', shape=[units_in, units_out])
-                params['theta_sc_cp_col'] = tf.get_variable(name='theta_sc_cp_col', shape=[units_in, units_out])
-                params['theta_sc_cp_all'] = tf.get_variable(name='theta_sc_cp_all', shape=[units_in, units_out])
+                params['theta_sc_sel'] = tf.get_variable(name='theta_sc_sel', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sc_row'] = tf.get_variable(name='theta_sc_row', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sc_col'] = tf.get_variable(name='theta_sc_col', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sc_all'] = tf.get_variable(name='theta_sc_all', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sc_sp_col'] = tf.get_variable(name='theta_sc_sp_col', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sc_sp_all'] = tf.get_variable(name='theta_sc_sp_all', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sc_cp_col'] = tf.get_variable(name='theta_sc_cp_col', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sc_cp_all'] = tf.get_variable(name='theta_sc_cp_all', shape=[units_in, units_out], trainable=is_training)
 
-                params['theta_sp_sel'] = tf.get_variable(name='theta_sp_sel', shape=[units_in, units_out])
-                params['theta_sp_row'] = tf.get_variable(name='theta_sp_row', shape=[units_in, units_out])
-                params['theta_sp_col'] = tf.get_variable(name='theta_sp_col', shape=[units_in, units_out])
-                params['theta_sp_all'] = tf.get_variable(name='theta_sp_all', shape=[units_in, units_out])
-                params['theta_sp_sc_col'] = tf.get_variable(name='theta_sp_sc_col', shape=[units_in, units_out])
-                params['theta_sp_sc_all'] = tf.get_variable(name='theta_sp_sc_all', shape=[units_in, units_out])
-                params['theta_sp_cp_row'] = tf.get_variable(name='theta_sp_cp_row', shape=[units_in, units_out])
-                params['theta_sp_cp_all'] = tf.get_variable(name='theta_sp_cp_all', shape=[units_in, units_out])
+                params['theta_sp_sel'] = tf.get_variable(name='theta_sp_sel', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sp_row'] = tf.get_variable(name='theta_sp_row', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sp_col'] = tf.get_variable(name='theta_sp_col', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sp_all'] = tf.get_variable(name='theta_sp_all', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sp_sc_col'] = tf.get_variable(name='theta_sp_sc_col', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sp_sc_all'] = tf.get_variable(name='theta_sp_sc_all', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sp_cp_row'] = tf.get_variable(name='theta_sp_cp_row', shape=[units_in, units_out], trainable=is_training)
+                params['theta_sp_cp_all'] = tf.get_variable(name='theta_sp_cp_all', shape=[units_in, units_out], trainable=is_training)
 
-                params['theta_cp_sel'] = tf.get_variable(name='theta_cp_sel', shape=[units_in, units_out])
-                params['theta_cp_row'] = tf.get_variable(name='theta_cp_row', shape=[units_in, units_out])
-                params['theta_cp_col'] = tf.get_variable(name='theta_cp_col', shape=[units_in, units_out])
-                params['theta_cp_all'] = tf.get_variable(name='theta_cp_all', shape=[units_in, units_out])
-                params['theta_cp_sp_row'] = tf.get_variable(name='theta_cp_sp_row', shape=[units_in, units_out])
-                params['theta_cp_sp_all'] = tf.get_variable(name='theta_cp_sp_all', shape=[units_in, units_out])
-                params['theta_cp_sc_row'] = tf.get_variable(name='theta_cp_sc_row', shape=[units_in, units_out])
-                params['theta_cp_sc_all'] = tf.get_variable(name='theta_cp_sc_all', shape=[units_in, units_out])
+                params['theta_cp_sel'] = tf.get_variable(name='theta_cp_sel', shape=[units_in, units_out], trainable=is_training)
+                params['theta_cp_row'] = tf.get_variable(name='theta_cp_row', shape=[units_in, units_out], trainable=is_training)
+                params['theta_cp_col'] = tf.get_variable(name='theta_cp_col', shape=[units_in, units_out], trainable=is_training)
+                params['theta_cp_all'] = tf.get_variable(name='theta_cp_all', shape=[units_in, units_out], trainable=is_training)
+                params['theta_cp_sp_row'] = tf.get_variable(name='theta_cp_sp_row', shape=[units_in, units_out], trainable=is_training)
+                params['theta_cp_sp_all'] = tf.get_variable(name='theta_cp_sp_all', shape=[units_in, units_out], trainable=is_training)
+                params['theta_cp_sc_row'] = tf.get_variable(name='theta_cp_sc_row', shape=[units_in, units_out], trainable=is_training)
+                params['theta_cp_sc_all'] = tf.get_variable(name='theta_cp_sc_all', shape=[units_in, units_out], trainable=is_training)
 
 
                 ## Marginalizations
@@ -307,11 +286,10 @@ class ExchangeableLayer(Layer):
                 student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_row, student_course['indices'], axis=0)
                 student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_col, student_course['indices'], axis=1)
                 student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_all, student_course['indices'], axis=None)
-                if self._side_info:
-                    student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_sp_vals_mix_col, student_course['indices'], axis=1)
-                    student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_sp_vals_mix_all, student_course['indices'], axis=None)
-                    student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_cp_vals_mix_row, student_course['indices'], axis=0)
-                    student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_cp_vals_mix_all, student_course['indices'], axis=None)
+                student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_sp_vals_mix_col, student_course['indices'], axis=1)
+                student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_sp_vals_mix_all, student_course['indices'], axis=None)
+                student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_cp_vals_mix_row, student_course['indices'], axis=0)
+                student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_cp_vals_mix_all, student_course['indices'], axis=None)
 
                 student_prof_vals = tf.reshape(tf.matmul(tf.reshape(student_prof['values'], shape=[-1, units_in]), params['theta_sp_sel']), [-1])
                 student_prof_vals = self.broadcast_add_marginal(student_prof_vals, student_prof_vals_row, student_prof['indices'], axis=0)
@@ -330,6 +308,7 @@ class ExchangeableLayer(Layer):
                 course_prof_vals = self.broadcast_add_marginal(course_prof_vals, cp_sp_vals_mix_all, course_prof['indices'], axis=None)
                 course_prof_vals = self.broadcast_add_marginal(course_prof_vals, cp_sc_vals_mix_col, course_prof['indices'], axis=1)
                 course_prof_vals = self.broadcast_add_marginal(course_prof_vals, cp_sc_vals_mix_all, course_prof['indices'], axis=None)
+
 
 
             if self.activation is not None:
@@ -354,7 +333,11 @@ class ExchangeableLayer(Layer):
                                'values':course_prof_vals,
                                'shape':course_prof['shape']}
 
+
+
             return {'student_course':student_course_out, 'student_prof':student_prof_out, 'course_prof':course_prof_out}
+
+
 
 
 class FeatureDropoutLayer(Layer):
@@ -410,7 +393,6 @@ class PoolingLayer(Layer):
         Layer.__init__(self, units)
         self._pool_mode = kwargs['pool_mode']
         self.scope = kwargs['scope']
-        self._side_info = kwargs.get('side_info', True)
 
 
     def get_output(self, tables, reuse=None, is_training=True):
@@ -428,14 +410,9 @@ class PoolingLayer(Layer):
         course_embeds_cp = self.marginalize_table(course_prof, pool_mode=self._pool_mode, axis=1, keep_dims=True)  # course_prof table, marginalized over profs [N_courses x 1 x units_in]
         prof_embeds_cp = self.marginalize_table(course_prof, pool_mode=self._pool_mode, axis=0, keep_dims=True)  # course_prof table, marginalized over courses [1 x N_profs x units_in]
 
-        if self._side_info:
-            student_embeds = student_embeds_sc + student_embeds_sp
-            course_embeds = course_embeds_sc + tf.expand_dims(tf.squeeze(course_embeds_cp), 0)
-            prof_embeds = prof_embeds_sp + prof_embeds_cp
-        else:
-            student_embeds = student_embeds_sc
-            course_embeds = course_embeds_sc
-            prof_embeds = prof_embeds_sp + prof_embeds_cp
+        student_embeds = student_embeds_sc + student_embeds_sp
+        course_embeds = course_embeds_sc + tf.expand_dims(tf.squeeze(course_embeds_cp), 0)
+        prof_embeds = prof_embeds_sp + prof_embeds_cp
 
         tables['student_course']['row_embeds'] = student_embeds
         tables['student_course']['col_embeds'] = course_embeds

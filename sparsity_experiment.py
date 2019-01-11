@@ -24,7 +24,7 @@ if __name__ == "__main__":
     auto_restore = False
     # save_model = False
 
-    opts = {'epochs':1000,
+    opts = {'epochs':10000,
                 'data_folder':'data',
                 'data_set':data_set,
                 'split_sizes':[.8, .2, .0], # train, validation, test split
@@ -41,7 +41,6 @@ if __name__ == "__main__":
                               'dropout_rate':dropout_rate,
                               'units_in':units_in,
                               'units_out':units_out,
-                              'variational':False,
                               'layers':[
                                         {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
                                         {'type':FeatureDropoutLayer, 'units_out':units},
@@ -55,10 +54,10 @@ if __name__ == "__main__":
                                         {'type':FeatureDropoutLayer, 'units_out':units},
                                         {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
                                         {'type':FeatureDropoutLayer, 'units_out':units},
-                                        {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                        {'type':FeatureDropoutLayer, 'units_out':units},
-                                        {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                        {'type':FeatureDropoutLayer, 'units_out':units},
+                                        # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                        # {'type':FeatureDropoutLayer, 'units_out':units},
+                                        # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                        # {'type':FeatureDropoutLayer, 'units_out':units},
                                         {'type':ExchangeableLayer, 'units_out':embedding_size_network,  'activation':None},
                                         {'type':PoolingLayer, 'units_out':embedding_size_network},
                                        ],
@@ -67,7 +66,6 @@ if __name__ == "__main__":
                                  'dropout_rate':dropout_rate,
                                  'units_in':embedding_size_network,
                                  'units_out':units_out,
-                                 'variational':False,
                                   'layers': [
                                       {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
                                       {'type':FeatureDropoutLayer, 'units_out':units},
@@ -81,10 +79,10 @@ if __name__ == "__main__":
                                       {'type':FeatureDropoutLayer, 'units_out': units},
                                       {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
                                       {'type':FeatureDropoutLayer, 'units_out':units},
-                                      {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                      {'type':FeatureDropoutLayer, 'units_out':units},
-                                      {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                      {'type':FeatureDropoutLayer, 'units_out':units},
+                                      # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                      # {'type':FeatureDropoutLayer, 'units_out':units},
+                                      # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                      # {'type':FeatureDropoutLayer, 'units_out':units},
                                       {'type':ExchangeableLayer, 'units_out':units_out, 'activation':None},
                               ],
                              },
@@ -102,11 +100,11 @@ if __name__ == "__main__":
 
     np.random.seed(9858776)
 
-    # percent_observed = [1., .5, .4, .3, .2, .1] # Must be decreasing
-    # percent_training = [.9, .8, .7, .6, .5]
+    percent_observed = [1., .5, .4, .3, .2, .1] # Must be decreasing
+    percent_training = [.9, .8, .7, .6, .5]
 
-    percent_observed = [1., .9, .85, .8, .75, .7, .65, .6, .55, .5]  # Must be decreasing
-    percent_training = [.9, .8, .7]
+    # percent_observed = [1., .9, .85, .8, .75, .7, .65, .6, .55, .5]  # Must be decreasing
+    # percent_training = [.9, .8, .7]
 
     embeddings = {}
     embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
