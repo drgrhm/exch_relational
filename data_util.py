@@ -109,7 +109,7 @@ class DataLoader:
 
 class ToyDataLoader:
 
-    def __init__(self, sizes, sparsity, split_sizes, num_features, embedding_size, min_observed, embeddings=None, alpha=None, observed=None):
+    def __init__(self, sizes, sparsity, split_sizes, num_features, embedding_size, min_observed, embeddings=None, observed=None, alpha=None, predict_unobserved=False):
         self.sizes = sizes
         self._n_students = sizes[0]
         self._n_courses = sizes[1]
@@ -118,12 +118,12 @@ class ToyDataLoader:
         self._num_features = num_features
         self._embedding_size = embedding_size
         self._min_observed = min_observed
+        self._observed = observed
+        self._predict_unobserved = predict_unobserved
 
-        if observed is None or alpha is None:
-            self._observed = {'sc':None, 'sp':None, 'cp':None}
+        if alpha is None:
             self._alpha = {'sc':None, 'sp':None, 'cp':None}
         else:
-            self._observed = observed
             self._alpha = alpha
 
         assert embedding_size == 2, 'Currently only embedding size of 2 is supported'
@@ -152,73 +152,63 @@ class ToyDataLoader:
         embeds_c = self.embeddings['course']
         embeds_p = self.embeddings['prof']
 
-        table_sc = self._make_table(embeds_s, embeds_c, tid=0, observed=self._observed['sc'], alpha=self._alpha['sc'])
-        table_sp = self._make_table(embeds_s, embeds_p, tid=1, observed=self._observed['sp'], alpha=self._alpha['sp'])
-        table_cp = self._make_table(embeds_c, embeds_p, tid=2, observed=self._observed['cp'], alpha=self._alpha['cp'])
+        if self._observed is None:
+            table_sc = self._make_table(embeds_s, embeds_c, tid=0, observed=None)
+            table_sp = self._make_table(embeds_s, embeds_p, tid=1, observed=None)
+            table_cp = self._make_table(embeds_c, embeds_p, tid=2, observed=None)
+        else:
+            table_sc = self._make_table(embeds_s, embeds_c, tid=0, observed=self._observed['sc'], alpha=self._alpha['sc'])
+            table_sp = self._make_table(embeds_s, embeds_p, tid=1, observed=self._observed['sp'], alpha=self._alpha['sp'])
+            table_cp = self._make_table(embeds_c, embeds_p, tid=2, observed=self._observed['cp'], alpha=self._alpha['cp'])
 
         return {'student_course': table_sc, 'student_prof':table_sp, 'course_prof':table_cp}
 
 
     def _make_table(self, row_embeds, col_embeds, tid, observed=None, alpha=None):
 
+        assert row_embeds.shape[1] == col_embeds.shape[1]
+
         n_rows = row_embeds.shape[0]
         n_cols = col_embeds.shape[0]
+        embeds_size = row_embeds.shape[1]
         shape = (n_rows, n_cols)
         tab = np.zeros((n_rows, n_cols))
 
         if alpha is None:
-            alpha = 2 * np.random.randn(4)
+            alpha = 3 * np.random.randn(2 * embeds_size)
+        alpha = np.reshape(alpha, (embeds_size, embeds_size))
 
         if self._embedding_size == 2:
             for i in range(n_rows):
                 for j in range(n_cols):
-                    # tab[i, j] = self._mixture_data(alpha, row_embeds[i, :], col_embeds[j, :])
-                    tab[i, j] = self._product_data(alpha, row_embeds[i, :], col_embeds[j, :])
+                    tab[i, j] = self._product_data(row_embeds[i, :], col_embeds[j, :])
+                    # tab[i, j] = self._quadratic_data(row_embeds[i, :], col_embeds[j, :], alpha)
         else:
             raise Exception('invalid embedding size')
 
         if observed is None:
-            observed = self._choose_observed(tid, shape, min_observed=self._min_observed)
+            observed = choose_observed(tid, shape, self._sparsity, min_observed=self._min_observed)
 
-        inds = np.array(np.nonzero(observed)).T
-        vals = tab.flatten()[observed.flatten() == 1]
-
-        return Table(tid, inds, vals, shape, self._split_sizes, num_features=self._num_features, embeddings=self.embeddings)
-
-
-    def _choose_observed(self, tid, shape, min_observed=1):
-        """Which entries of the matrix to consider as observed."""
-
-        obs = np.random.choice([0,1], shape, p=(1-self._sparsity, self._sparsity))
-
-        rows = np.sum(obs, axis=1)
-        for i in  np.array(range(shape[0]))[rows < min_observed]:
-            jj = np.random.choice(range(shape[1]), min_observed, replace=False)
-            obs[i, jj] = 1
-
-        cols = np.sum(obs, axis=0)
-        for j in  np.array(range(shape[1]))[cols < min_observed]:
-            ii = np.random.choice(range(shape[0]), min_observed, replace=False)
-            obs[ii, j] = 1
-
-        print("final density of observed values in table ", tid,  ": ", np.sum(obs) / (shape[0] * shape[1]))
-
-        return obs
-
-
-    def _product_data(self, alpha, row_embed, col_embed, weighted=False):
-        """Produce data values by a (weighted) inner product of row and column embeddings."""
-        if weighted:
-            a = alpha
+        if self._predict_unobserved:
+            inds = np.array(np.nonzero(np.ones((n_rows, n_cols)))).T
+            vals = tab.flatten()
+            split = 1. - observed.flatten()
         else:
-            a = np.ones_like(alpha)
-        return a[0] * row_embed[0] * col_embed[0] + \
-               a[1] * row_embed[1] * col_embed[1]
+            inds = np.array(np.nonzero(observed)).T
+            vals = tab.flatten()[observed.flatten() == 1]
+            split = None
+
+        return Table(tid, inds, vals, shape, num_features=self._num_features, split_sizes=self._split_sizes, split=split, embeddings=self.embeddings)
 
 
-    def _mixture_data(self, alpha, row_embed, col_embed):
-        """Produce data values in a manner similar to _product_data, but doesn't imply that row_embed, col_embed are in same space."""
-        return alpha[0] * row_embed[0] * col_embed[0] + \
-               alpha[1] * row_embed[0] * col_embed[1] + \
-               alpha[2] * row_embed[1] * col_embed[0] + \
-               alpha[3] * row_embed[1] * col_embed[1]
+
+
+
+    def _product_data(self, row_embed, col_embed):
+        """Produce data values by a (weighted) inner product of row and column embeddings."""
+        return np.dot(row_embed, col_embed)
+
+    def _quadratic_data(self, row_embed, col_embed, alpha):
+        """Produce data values as quadratic form: row_embed^T alpha col_embed."""
+        return row_embed[None, :] @ alpha @ col_embed[:, None]
+

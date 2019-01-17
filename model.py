@@ -18,6 +18,7 @@ class Model:
             name = 'layer_' + str(l)
             units_out = layer['units_out']
             activation = layer.get('activation', None)
+            save_embeddings = layer.get('save_embeddings', False)
             skip_connections = layer.get('skip_connections', False)
             self.layers[name] = layer['type'](units=[units_in, units_out],
                                               pool_mode=pool_mode,
@@ -25,6 +26,7 @@ class Model:
                                               activation=activation,
                                               skip_connections=skip_connections,
                                               side_info=side_info,
+                                              save_embeddings=save_embeddings,
                                               # variational=variational,
                                               scope=name)
             units_in = units_out

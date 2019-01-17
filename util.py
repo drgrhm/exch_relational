@@ -89,24 +89,24 @@ def normalize(x):
 #     plt.clf()
 
 
-def plot_embeddings(embeds, predicts, title, path, sort=False, plot_rate=1., remove_outliers=False):
+def plot_embeddings(embeds, predicts, path, title=None, xlabel=None, ylabel=None, sort=False, plot_rate=1., remove_outliers=False):
 
     assert embeds.shape[1] == 2
     assert embeds.shape == predicts.shape
 
-    if sort:
-        score = np.zeros((embeds.shape[0], 5))
-        score[:,0] = embeds[:,0] * embeds[:,1]
-        score[:,1:3] = embeds
-        score[:,3:] = predicts
-        score.view('f8,f8,f8,f8,f8').sort(order=['f0'], axis=0)
-        embeds = score[:, 1:3]
-        predicts = score[:, 3:]
-
-    if plot_rate < 1.:
-        mask = np.random.choice((0,1), size=embeds.shape[0], replace=True, p=(1-plot_rate, plot_rate))
-        embeds = embeds[mask == 1,:]
-        predicts = predicts[mask == 1, :]
+    # if sort:
+    #     score = np.zeros((embeds.shape[0], 5))
+    #     score[:,0] = embeds[:,0] * embeds[:,1]
+    #     score[:,1:3] = embeds
+    #     score[:,3:] = predicts
+    #     score.view('f8,f8,f8,f8,f8').sort(order=['f0'], axis=0)
+    #     embeds = score[:, 1:3]
+    #     predicts = score[:, 3:]
+    #
+    # if plot_rate < 1.:
+    #     mask = np.random.choice((0,1), size=embeds.shape[0], replace=True, p=(1-plot_rate, plot_rate))
+    #     embeds = embeds[mask == 1,:]
+    #     predicts = predicts[mask == 1, :]
 
     if remove_outliers:
         mean_x = np.mean(predicts[:, 0])
@@ -122,17 +122,24 @@ def plot_embeddings(embeds, predicts, title, path, sort=False, plot_rate=1., rem
         embeds = embeds[nonoutliers, :]
         predicts = predicts[nonoutliers, :]
 
-    plt.title(title)
-    # plt.locator_params(axis='x', nbins=5)
-    # plt.locator_params(axis='y', nbins=5)
+    if title is not None:
+        plt.title(title)
+    plt.locator_params(axis='x', nbins=5)
+    plt.locator_params(axis='y', nbins=5)
+
     s = 10 + 10 * np.exp(normalize(embeds[:, 0]))
     c = sigmoid(normalize(embeds[:, 1]))
-    # s = 30 * normalize(embeds[:, 0])
-    # c = normalize(embeds[:, 1])
     plt.scatter(predicts[:,0], predicts[:,1], s=s, c=c, cmap='plasma', alpha=.5)
-    plt.xlabel('embedding[0]')
-    plt.ylabel('embedding[1]')
-    plt.show()
+
+    # s = 10 + 10 * np.exp(normalize(predicts[:, 0]))
+    # c = sigmoid(normalize(predicts[:, 1]))
+    # plt.scatter(embeds[:, 0], embeds[:, 1], s=s, c=c, cmap='plasma', alpha=.5)
+
+    if xlabel is not None:
+        plt.xlabel(xlabel)
+    if ylabel is not None:
+        plt.xlabel(ylabel)
+    # plt.show()
     plt.savefig(path, bbox_inches='tight')
     plt.clf()
 
@@ -165,9 +172,13 @@ def plot_loss(losses_tr, losses_vl, mean_tr, title, path):
 
 def gaussian_embeddings(embedding_size, n_embeddings):
     """Multivariate Gaussian feature embeddings."""
-    means = np.random.normal(0, 10, embedding_size)
-    stds = np.random.uniform(1, 10, embedding_size)
-    embeds = np.random.multivariate_normal(means, np.diag(stds), size=n_embeddings)
+    # means = np.random.normal(0, 10, embedding_size)
+    # means = np.random.normal(0, 1, embedding_size)
+    # stds = np.random.uniform(1, 10, embedding_size)
+    # embeds = np.random.multivariate_normal(means, np.diag(stds), size=n_embeddings)
+
+    embeds = np.random.multivariate_normal([0, 0], [[1, 0], [0, 1]], size=n_embeddings)
+
     return embeds
 
 

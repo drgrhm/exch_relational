@@ -1,9 +1,9 @@
 import numpy as np
 import tensorflow as tf
-import matplotlib
-matplotlib.use('Agg')
+# import matplotlib
+# matplotlib.use('Agg')
 import os
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import glob
 import math
 from util import *
@@ -23,7 +23,6 @@ def main(opts, restore_point=None):
     if opts['debug']:
         np.random.seed(opts['seed'])
 
-
     data = opts.get('data', None)
     if data is None:
         data = ToyDataLoader(opts['toy_data']['size'],
@@ -33,10 +32,10 @@ def main(opts, restore_point=None):
                              opts['toy_data']['embedding_size'],
                              opts['toy_data']['min_observed'])
 
-    if opts['split_sizes'][2] == 0:
+    if opts['split_sizes'] is None or opts['split_sizes'][2] == 0:
         mean = np.mean(data.tables['student_course'].values_tr)
         split = data.tables['student_course'].split
-        loss_mean = np_rmse_loss(data.tables['student_course'].values_tr_vl, mean * np.ones_like(data.tables['student_course'].values_tr_vl), split[split == 1])  # Loss on validation set when predicting training mean
+        loss_mean = np_rmse_loss(data.tables['student_course'].values_tr_vl, mean * np.ones_like(data.tables['student_course'].values_tr_vl), 1. * (split == 1))  # Loss on validation set when predicting training mean
     else:
         mean = np.mean(data.tables['student_course'].values_tr_vl)
         split = data.tables['student_course'].split
@@ -146,20 +145,16 @@ def main(opts, restore_point=None):
         decoder_tables_vl['course_prof']['col_embeds'] = prof_embeds_vl
         decoder_tables_vl['course_prof']['shape'] = course_prof['shape']
 
-
         with tf.variable_scope('decoder'):
             decoder = Model(**opts['decoder_opts'])
             decoder_out_tr = decoder.get_output(decoder_tables_tr)
             decoder_out_vl = decoder.get_output(decoder_tables_vl, reuse=True, is_training=False)
 
-
         rec_loss_tr = rmse_loss(student_course['values'], decoder_out_tr['student_course']['values'], student_course['noise_mask'])
         rec_loss_vl = rmse_loss(student_course['values'], decoder_out_vl['student_course']['values'], student_course['noise_mask'])
 
-
         train_step = tf.train.AdamOptimizer(opts['learning_rate']).minimize(rec_loss_tr)
-        # train_step = tf.train.MomentumOptimizer(opts['learning_rate'], 0.1).minimize(rec_loss_tr)
-        # train_step = tf.train.RMSPropOptimizer(opts['learning_rate'], 0.99, momentum=0.9).minimize(rec_loss_tr)
+
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
         sess.run(tf.global_variables_initializer())
 
@@ -172,19 +167,12 @@ def main(opts, restore_point=None):
         loss_tr_best_ep = 0
         loss_vl_best_ep = 0
 
-        student_embeds_out_tr = []
-        course_embeds_out_tr = []
-        prof_embeds_out_tr = []
-        student_embeds_out_vl = []
-        course_embeds_out_vl = []
-        prof_embeds_out_vl = []
-
-        student_embeds_out_tr_best = []
-        course_embeds_out_tr_best = []
-        prof_embeds_out_tr_best = []
         student_embeds_out_vl_best = []
         course_embeds_out_vl_best = []
         prof_embeds_out_vl_best = []
+        student_embeds_out_tr_best = []
+        course_embeds_out_tr_best = []
+        prof_embeds_out_tr_best = []
 
         saver = tf.train.Saver()
         if restore_point is not None:
@@ -195,13 +183,55 @@ def main(opts, restore_point=None):
             losses_tr = list(loss_data['losses_tr'])
             losses_vl = list(loss_data['losses_vl'])
             losses_ts = list(loss_data['losses_ts'])
-            loss_tr_best = loss_data['losses_tr_best']
-            loss_vl_best = loss_data['losses_vl_best']
-            loss_tr_best_ep = loss_data['losses_tr_best_ep']
-            loss_vl_best_ep = loss_data['losses_vl_best_ep']
+            loss_tr_best = loss_data['loss_tr_best']
+            loss_vl_best = loss_data['loss_vl_best']
+            loss_tr_best_ep = loss_data['loss_tr_best_ep']
+            loss_vl_best_ep = loss_data['loss_vl_best_ep']
             loss_ts_vl_best = loss_data['loss_ts_vl_best']
             loss_file.close()
 
+        ## Evaluation only
+        if opts['evaluate_only']:
+
+            split_eval = 1. * (data.tables['student_course'].split == 1)
+            vals_eval = data.tables['student_course'].values_all * (split_eval == 0)
+
+            eval_dict = {student_course['indices']:data.tables['student_course'].indices_all,
+                         student_course['values']:data.tables['student_course'].values_all,  # values used when calculating loss
+                         student_course['noise_mask']:split_eval,
+                         student_course['values_noisy']:vals_eval,  # values used for making predictions
+                         student_prof['indices']:data.tables['student_prof'].indices_all,
+                         student_prof['values']:data.tables['student_prof'].values_all,
+                         course_prof['indices']:data.tables['course_prof'].indices_all,
+                         course_prof['values']:data.tables['course_prof'].values_all,
+                         }
+
+            loss_eval, student_embeds_out_eval, course_embeds_out_eval, prof_embeds_out_eval = sess.run([rec_loss_vl,
+                                                                                                         student_embeds_vl,
+                                                                                                         course_embeds_vl,
+                                                                                                         prof_embeds_vl], feed_dict=eval_dict)
+            return loss_eval, loss_mean
+
+
+        split_vl = data.tables['student_course'].split[data.tables['student_course'].split <= 1]
+        vals_vl = data.tables['student_course'].values_tr_vl * (split_vl == 0)
+
+        vl_dict = {student_course['indices']:data.tables['student_course'].indices_tr_vl,
+                   student_course['values']:data.tables['student_course'].values_tr_vl,  # values used when calculating loss
+                   student_course['noise_mask']:split_vl,
+                   student_course['values_noisy']:vals_vl,  # values used for making predictions
+                   student_prof['indices']:data.tables['student_prof'].indices_tr_vl,
+                   student_prof['values']:data.tables['student_prof'].values_tr_vl,
+                   course_prof['indices']:data.tables['course_prof'].indices_tr_vl,
+                   course_prof['values']:data.tables['course_prof'].values_tr_vl,
+                   }
+
+        student_embeds_init, course_embeds_init, prof_embeds_init, = sess.run([encoder_out_vl['student_course']['row_embeds'],
+                                                                               encoder_out_vl['student_course']['col_embeds'],
+                                                                               encoder_out_vl['student_prof']['col_embeds']], feed_dict=vl_dict)
+
+        # plot_embeddings(data.tables['student_course'].embeddings['student'], np.squeeze(student_embeds_init), 'img/test.pdf', title=None, xlabel=None, ylabel=None, remove_outliers=True)
+        # student_embeds_init, course_embeds_init, prof_embeds_init = 0,0,0
 
         for ep in range(opts['restore_point_epoch'] + 1, opts['restore_point_epoch'] + opts['epochs'] + 1):
             if opts['verbosity'] > 0:
@@ -209,7 +239,7 @@ def main(opts, restore_point=None):
 
             ## Training
             n_tr = data.tables['student_course'].values_tr.shape[0]
-            n_compute = int(n_tr * (opts['split_sizes'][0] + opts['split_sizes'][1]))
+            n_compute = int(n_tr * (opts['split_sizes'][0]))
             n_predict = n_tr - n_compute
 
             split_tr = np.concatenate((np.zeros(n_compute, np.int32), np.ones(n_predict, np.int32)))
@@ -241,7 +271,6 @@ def main(opts, restore_point=None):
                 course_embeds_out_tr_best = course_embeds_out_tr
                 prof_embeds_out_tr_best = prof_embeds_out_tr
 
-
             ## Validation
             split_vl = data.tables['student_course'].split[data.tables['student_course'].split <= 1]
             vals_vl = data.tables['student_course'].values_tr_vl * (split_vl == 0)
@@ -256,10 +285,13 @@ def main(opts, restore_point=None):
                        course_prof['values']:data.tables['course_prof'].values_tr_vl,
                        }
 
-            loss_vl, student_embeds_out_vl, course_embeds_out_vl, prof_embeds_out_vl = sess.run([rec_loss_vl,
-                                                                             encoder_out_vl['student_course']['row_embeds'],
-                                                                             encoder_out_vl['student_course']['col_embeds'],
-                                                                             encoder_out_vl['student_prof']['col_embeds']], feed_dict=vl_dict)
+            loss_vl, student_embeds_out_vl, course_embeds_out_vl, prof_embeds_out_vl, = sess.run([rec_loss_vl,
+                                                                                         encoder_out_vl['student_course']['row_embeds'],
+                                                                                         encoder_out_vl['student_course']['col_embeds'],
+                                                                                         encoder_out_vl['student_prof']['col_embeds']], feed_dict=vl_dict)
+                                                                                         # encoder_out_vl['student_course']['row_embeds_init'],
+                                                                                         # encoder_out_vl['student_course']['col_embeds_init'],
+                                                                                         # encoder_out_vl['student_prof']['col_embeds_init']], feed_dict=vl_dict)
             losses_vl.append(loss_vl)
 
             ## Testing
@@ -296,8 +328,7 @@ def main(opts, restore_point=None):
                 course_embeds_out_vl_best = course_embeds_out_vl
                 prof_embeds_out_vl_best = prof_embeds_out_vl
 
-
-
+                ## save model when validation loss improves
                 # if loss_improvement > opts['loss_save_tolerance'] and opts['save_model']:
                 if opts['save_model']:
                     model_path = os.path.join(opts['checkpoints_folder'], 'best.ckpt')
@@ -315,66 +346,55 @@ def main(opts, restore_point=None):
                              loss_mean=loss_mean,
                              loss_tr_best_ep=loss_tr_best_ep,
                              loss_vl_best_ep=loss_vl_best_ep)
-                    loss_file.close()
 
-                    embeds_path = os.path.join(opts['checkpoints_folder'], 'embeddings_BEST.npz')
+                    embeds_path = os.path.join(opts['checkpoints_folder'], 'embeddings_vl_best.npz')
                     embeds_file = open(embeds_path, 'wb')
                     np.savez(embeds_file,
                              student_embeds_in=data.tables['student_course'].embeddings['student'],
                              course_embeds_in=data.tables['student_course'].embeddings['course'],
                              prof_embeds_in=data.tables['student_prof'].embeddings['prof'],
-                             student_embeds_out_tr=student_embeds_out_tr,
-                             course_embeds_out_tr=course_embeds_out_tr,
-                             prof_embeds_out_tr=prof_embeds_out_tr,
-                             student_embeds_out_vl=student_embeds_out_vl,
-                             course_embeds_out_vl=course_embeds_out_vl,
-                             prof_embeds_out_vl=prof_embeds_out_vl,
-                             student_embeds_out_tr_best=student_embeds_out_tr_best,
-                             course_embeds_out_tr_best=course_embeds_out_tr_best,
-                             prof_embeds_out_tr_best=prof_embeds_out_tr_best,
                              student_embeds_out_vl_best=student_embeds_out_vl_best,
                              course_embeds_out_vl_best=course_embeds_out_vl_best,
-                             prof_embeds_out_vl_best=prof_embeds_out_vl_best)
+                             prof_embeds_out_vl_best=prof_embeds_out_vl_best,
+                             student_embeds_init=student_embeds_init,
+                             course_embeds_init=course_embeds_init,
+                             prof_embeds_init=prof_embeds_init)
                     embeds_file.close()
 
+            ## save EMBEDDINGS ONLY periodically.
+            if ep % opts['save_frequency'] == 0 and opts['save_model']:
+                # model_path = os.path.join(opts['checkpoints_folder'], 'ep_{:05d}.ckpt'.format(ep))
+                # saver.save(sess, model_path)
+                #
+                # loss_path = os.path.join(opts['checkpoints_folder'], 'loss_{:05d}.npz'.format(ep))
+                # loss_file = open(loss_path, 'wb')
+                # np.savez(loss_file,
+                #          losses_tr=losses_tr,
+                #          losses_vl=losses_vl,
+                #          losses_ts=losses_ts,
+                #          loss_tr_best=loss_tr_best,
+                #          loss_vl_best=loss_vl_best,
+                #          loss_ts_vl_best=loss_ts_vl_best,
+                #          loss_mean=loss_mean,
+                #          loss_tr_best_ep=loss_tr_best_ep,
+                #          loss_vl_best_ep=loss_vl_best_ep)
 
-
-
-            # if ep % opts['save_frequency'] == 0 and ep > 0 and opts['save_model']:
-            #     model_path = os.path.join(opts['checkpoints_folder'], 'epoch_{:05d}'.format(ep) + '.ckpt')
-            #     saver.save(sess, model_path)
-            #
-            #     loss_path = os.path.join(opts['checkpoints_folder'], 'loss.npz')
-            #     loss_file = open(loss_path, 'wb')
-            #     np.savez(loss_file,
-            #              losses_tr=losses_tr,
-            #              losses_vl=losses_vl,
-            #              loss_tr_best=loss_tr_best,
-            #              loss_vl_best=loss_vl_best,
-            #              loss_tr_best_ep=loss_tr_best_ep,
-            #              loss_vl_best_ep=loss_vl_best_ep)
-            #     loss_file.close()
-            #
-            #     embeds_path = os.path.join(opts['checkpoints_folder'], 'embeddings.npz')
-            #     embeds_file = open(embeds_path, 'wb')
-            #     np.savez(embeds_file,
-            #              student_embeds_in=data.tables['student_course'].embeddings['student'],
-            #              course_embeds_in=data.tables['student_course'].embeddings['course'],
-            #              prof_embeds_in=data.tables['student_prof'].embeddings['prof'],
-            #              student_embeds_out_tr=student_embeds_out_tr,
-            #              course_embeds_out_tr=course_embeds_out_tr,
-            #              prof_embeds_out_tr=prof_embeds_out_tr,
-            #              student_embeds_out_vl=student_embeds_out_vl,
-            #              course_embeds_out_vl=course_embeds_out_vl,
-            #              prof_embeds_out_vl=prof_embeds_out_vl,
-            #              student_embeds_out_tr_best=student_embeds_out_tr_best,
-            #              course_embeds_out_tr_best=course_embeds_out_tr_best,
-            #              prof_embeds_out_tr_best=prof_embeds_out_tr_best,
-            #              student_embeds_out_vl_best=student_embeds_out_vl_best,
-            #              course_embeds_out_vl_best=course_embeds_out_vl_best,
-            #              prof_embeds_out_vl_best=prof_embeds_out_vl_best)
-            #     embeds_file.close()
-
+                embeds_path = os.path.join(opts['checkpoints_folder'], 'embeddings_{:05d}.npz'.format(ep))
+                embeds_file = open(embeds_path, 'wb')
+                np.savez(embeds_file,
+                         student_embeds_in=data.tables['student_course'].embeddings['student'],
+                         course_embeds_in=data.tables['student_course'].embeddings['course'],
+                         prof_embeds_in=data.tables['student_prof'].embeddings['prof'],
+                         student_embeds_out_tr_best=student_embeds_out_tr_best,
+                         course_embeds_out_tr_best=course_embeds_out_tr_best,
+                         prof_embeds_out_tr_best=prof_embeds_out_tr_best,
+                         student_embeds_out_vl_best=student_embeds_out_vl_best,
+                         course_embeds_out_vl_best=course_embeds_out_vl_best,
+                         prof_embeds_out_vl_best=prof_embeds_out_vl_best,
+                         student_embeds_init=student_embeds_init,
+                         course_embeds_init=course_embeds_init,
+                         prof_embeds_init=prof_embeds_init)
+                embeds_file.close()
 
             if opts['verbosity'] > 0:
                 print("\t training loss:   {:5.5f}\t (best: {:5.5f} at epoch {:5d})".format(loss_tr, loss_tr_best, loss_tr_best_ep))
@@ -382,9 +402,8 @@ def main(opts, restore_point=None):
                 print("\t test loss:       {:5.5f}\t (at best validation: {:5.5f})".format(loss_ts, loss_ts_vl_best))
                 print("\t predict mean:    {:5.5f}".format(loss_mean))
 
-
-
-        return loss_vl_best
+        # return loss_vl_best, loss_mean
+        return loss_ts_vl_best, loss_mean
 
 
 if __name__ == "__main__":
@@ -396,7 +415,7 @@ if __name__ == "__main__":
 
     units_in = 1
     embedding_size_data = 2
-    embedding_size_network = 16
+    embedding_size_network = 2
     units = 128
     units_out = 1
 
@@ -408,7 +427,6 @@ if __name__ == "__main__":
     auto_restore = False
     save_model = True
 
-
     opts = {'epochs':10000,
             'data_folder':'data',
             'data_set':data_set,
@@ -417,7 +435,7 @@ if __name__ == "__main__":
             'regularization_rate':.00001,
             'learning_rate':.0001,
             'toy_data':{'size':[200, 100, 50],
-                        'sparsity':.1,
+                        'sparsity':.01,
                         'embedding_size':embedding_size_data,
                         'min_observed':2, # generate at least 2 entries per row and column (sparsity rate will be affected)
             },
@@ -426,7 +444,7 @@ if __name__ == "__main__":
                           'units_in':units_in,
                           'units_out':units_out,
                           'layers':[
-                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
+                                    {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'save_embeddings':True},
                                     {'type':FeatureDropoutLayer, 'units_out':units},
                                     {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
                                     {'type':FeatureDropoutLayer, 'units_out':units},
@@ -438,10 +456,10 @@ if __name__ == "__main__":
                                     {'type':FeatureDropoutLayer, 'units_out':units},
                                     {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
                                     {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # {'type':FeatureDropoutLayer, 'units_out':units},
+                                    # # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    # # {'type':FeatureDropoutLayer, 'units_out':units},
+                                    # # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                    # # {'type':FeatureDropoutLayer, 'units_out':units},
                                     {'type':ExchangeableLayer, 'units_out':embedding_size_network,  'activation':None},
                                     {'type':PoolingLayer, 'units_out':embedding_size_network},
                                    ],
@@ -474,11 +492,12 @@ if __name__ == "__main__":
             'checkpoints_folder':'checkpoints',
             'restore_point_epoch':-1,
             'save_model':save_model,
-            'save_frequency':50, # Save model every save_frequency epochs
+            'save_frequency':500, # Save model every save_frequency epochs
             'loss_save_tolerance':.01, # If loss changes by more than loss_save_tolerance (as % of old value), save the model
             'debug':True, # Set random seeds or not
-            'seed':9858776,
+            # 'seed':9858776,
             # 'seed': 9870112,
+            'seed':73394,
             }
 
 

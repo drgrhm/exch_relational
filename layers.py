@@ -136,6 +136,8 @@ class ExchangeableLayer(Layer):
         self.skip_connections = kwargs.get('skip_connections', False)
         # self.output_embeddings = kwargs.get('output_embeddings', False)
         self.embedding_size = kwargs.get('embedding_size', 2)
+        self.save_embeddings = kwargs.get('save_embeddings', False)
+        self._side_info = kwargs.get('side_info', True)
         self.scope = kwargs['scope']
         self.params = {}
 
@@ -154,7 +156,6 @@ class ExchangeableLayer(Layer):
             student_embeds = student_course.get('row_embeds', None)
             course_embeds = student_course.get('col_embeds', None)
             prof_embeds = student_prof.get('col_embeds', None)
-
 
             if student_embeds is not None and course_embeds is not None and prof_embeds is not None:
 
@@ -191,7 +192,6 @@ class ExchangeableLayer(Layer):
                 student_prof_vals = self.broadcast_add_marginal(student_prof_vals, student_prof_vals_col, student_prof['indices'], axis=0)
                 student_prof_vals = self.broadcast_add_marginal(student_prof_vals, student_prof_vals_row_pool, student_prof['indices'], axis=None)
                 student_prof_vals = self.broadcast_add_marginal(student_prof_vals, student_prof_vals_col_pool, student_prof['indices'], axis=None)
-
 
                 ## course_prof
                 params['theta_cp_row_embed'] = tf.get_variable(name='theta_cp_row_embed', shape=[units_in, units_out], trainable=is_training)
@@ -286,10 +286,11 @@ class ExchangeableLayer(Layer):
                 student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_row, student_course['indices'], axis=0)
                 student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_col, student_course['indices'], axis=1)
                 student_course_vals = self.broadcast_add_marginal(student_course_vals, student_course_vals_all, student_course['indices'], axis=None)
-                student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_sp_vals_mix_col, student_course['indices'], axis=1)
-                student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_sp_vals_mix_all, student_course['indices'], axis=None)
-                student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_cp_vals_mix_row, student_course['indices'], axis=0)
-                student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_cp_vals_mix_all, student_course['indices'], axis=None)
+                if self._side_info:
+                    student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_sp_vals_mix_col, student_course['indices'], axis=1)
+                    student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_sp_vals_mix_all, student_course['indices'], axis=None)
+                    student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_cp_vals_mix_row, student_course['indices'], axis=0)
+                    student_course_vals = self.broadcast_add_marginal(student_course_vals, sc_cp_vals_mix_all, student_course['indices'], axis=None)
 
                 student_prof_vals = tf.reshape(tf.matmul(tf.reshape(student_prof['values'], shape=[-1, units_in]), params['theta_sp_sel']), [-1])
                 student_prof_vals = self.broadcast_add_marginal(student_prof_vals, student_prof_vals_row, student_prof['indices'], axis=0)
@@ -308,8 +309,6 @@ class ExchangeableLayer(Layer):
                 course_prof_vals = self.broadcast_add_marginal(course_prof_vals, cp_sp_vals_mix_all, course_prof['indices'], axis=None)
                 course_prof_vals = self.broadcast_add_marginal(course_prof_vals, cp_sc_vals_mix_col, course_prof['indices'], axis=1)
                 course_prof_vals = self.broadcast_add_marginal(course_prof_vals, cp_sc_vals_mix_all, course_prof['indices'], axis=None)
-
-
 
             if self.activation is not None:
                 student_course_vals = self.activation(student_course_vals)
@@ -332,8 +331,6 @@ class ExchangeableLayer(Layer):
             course_prof_out = {'indices':course_prof['indices'],
                                'values':course_prof_vals,
                                'shape':course_prof['shape']}
-
-
 
             return {'student_course':student_course_out, 'student_prof':student_prof_out, 'course_prof':course_prof_out}
 
@@ -391,9 +388,9 @@ class PoolingLayer(Layer):
 
     def __init__(self, units, **kwargs):
         Layer.__init__(self, units)
-        self._pool_mode = kwargs['pool_mode']
+        self.pool_mode = kwargs['pool_mode']
         self.scope = kwargs['scope']
-
+        self._side_info = kwargs.get('side_info', True)
 
     def get_output(self, tables, reuse=None, is_training=True):
 
@@ -401,18 +398,23 @@ class PoolingLayer(Layer):
         student_prof = tables['student_prof']
         course_prof = tables['course_prof']
 
-        student_embeds_sc = self.marginalize_table(student_course, pool_mode=self._pool_mode, axis=1, keep_dims=True)  # student_course table, marginalized over courses [N_students x 1 x units_in]
-        course_embeds_sc = self.marginalize_table(student_course, pool_mode=self._pool_mode, axis=0, keep_dims=True)  # student_course table, marginalized over students [1 x N_courses x units_in]
+        student_embeds_sc = self.marginalize_table(student_course, pool_mode=self.pool_mode, axis=1, keep_dims=True)  # student_course table, marginalized over courses [N_students x 1 x units_in]
+        course_embeds_sc = self.marginalize_table(student_course, pool_mode=self.pool_mode, axis=0, keep_dims=True)  # student_course table, marginalized over students [1 x N_courses x units_in]
 
-        student_embeds_sp = self.marginalize_table(student_prof, pool_mode=self._pool_mode, axis=1, keep_dims=True)  # student_prof table, marginalized over profs [N_students x 1 x units_in]
-        prof_embeds_sp = self.marginalize_table(student_prof, pool_mode=self._pool_mode, axis=0, keep_dims=True)  # student_prof table, marginalized over students [1 x N_profs x units_in]
+        student_embeds_sp = self.marginalize_table(student_prof, pool_mode=self.pool_mode, axis=1, keep_dims=True)  # student_prof table, marginalized over profs [N_students x 1 x units_in]
+        prof_embeds_sp = self.marginalize_table(student_prof, pool_mode=self.pool_mode, axis=0, keep_dims=True)  # student_prof table, marginalized over students [1 x N_profs x units_in]
 
-        course_embeds_cp = self.marginalize_table(course_prof, pool_mode=self._pool_mode, axis=1, keep_dims=True)  # course_prof table, marginalized over profs [N_courses x 1 x units_in]
-        prof_embeds_cp = self.marginalize_table(course_prof, pool_mode=self._pool_mode, axis=0, keep_dims=True)  # course_prof table, marginalized over courses [1 x N_profs x units_in]
+        course_embeds_cp = self.marginalize_table(course_prof, pool_mode=self.pool_mode, axis=1, keep_dims=True)  # course_prof table, marginalized over profs [N_courses x 1 x units_in]
+        prof_embeds_cp = self.marginalize_table(course_prof, pool_mode=self.pool_mode, axis=0, keep_dims=True)  # course_prof table, marginalized over courses [1 x N_profs x units_in]
 
-        student_embeds = student_embeds_sc + student_embeds_sp
-        course_embeds = course_embeds_sc + tf.expand_dims(tf.squeeze(course_embeds_cp), 0)
-        prof_embeds = prof_embeds_sp + prof_embeds_cp
+        if self._side_info:
+            student_embeds = student_embeds_sc + student_embeds_sp
+            course_embeds = course_embeds_sc + tf.expand_dims(tf.squeeze(course_embeds_cp), 0)
+            prof_embeds = prof_embeds_sp + prof_embeds_cp
+        else:
+            student_embeds = student_embeds_sc
+            course_embeds = course_embeds_sc
+            prof_embeds = prof_embeds_sp + prof_embeds_cp
 
         tables['student_course']['row_embeds'] = student_embeds
         tables['student_course']['col_embeds'] = course_embeds
