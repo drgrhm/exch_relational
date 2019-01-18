@@ -334,7 +334,7 @@ def main(opts, restore_point=None):
                 ## save model when validation loss improves
                 if opts['save_model'] and loss_improvement > opts['loss_save_improvement']:
                     loss_vl_last_save = loss_vl
-                    print("-------  SAVING MODEL (loss improvement: {d}) ------- ".format(loss_improvement))
+                    print("-------  SAVING MODEL (loss improvement: {:f}) ------- ".format(loss_improvement))
                     model_path = os.path.join(opts['checkpoints_folder'], 'best.ckpt')
                     saver.save(sess, model_path)
 
