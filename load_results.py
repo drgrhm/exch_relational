@@ -7,15 +7,16 @@ import glob
 if __name__ == "__main__":
 
     # experiment = 'sparsity'
-    # experiment = 'embedding'
+    experiment = 'embedding'
     # experiment = 'other_sparsity'
-    experiment = 'side_info'
+    # experiment = 'side_info'
 
     ## Embeddings experiment
     if experiment == 'embedding':
 
-        np.random.seed(122333)
+        np.random.seed(9873866)
         seeds = np.random.randint(low=0, high=1000000, size=1)
+        # seeds = [199527]
         for seed in seeds:
 
             image_path = 'img/embedding_experiment/' + str(seed) + '/'

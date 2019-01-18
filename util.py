@@ -177,7 +177,13 @@ def gaussian_embeddings(embedding_size, n_embeddings):
     # stds = np.random.uniform(1, 10, embedding_size)
     # embeds = np.random.multivariate_normal(means, np.diag(stds), size=n_embeddings)
 
-    embeds = np.random.multivariate_normal([0, 0], [[1, 0], [0, 1]], size=n_embeddings)
+    # means = np.random.normal(0, .1, embedding_size)
+    # embeds = np.random.multivariate_normal([0, 1], [[1, 0], [0, 1]], size=n_embeddings)
+
+    embeds = np.random.uniform(-2, 2, size=embedding_size*n_embeddings).reshape((n_embeddings, embedding_size))
+
+    # print('MEANS', means)
+    # print("EMBEDS", embeds[:5, :])
 
     return embeds
 

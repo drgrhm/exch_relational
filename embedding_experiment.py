@@ -23,7 +23,7 @@ if __name__ == "__main__":
     auto_restore = False
     save_model = True
 
-    opts = {'epochs':30000,
+    opts = {'epochs':20000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1],  # train, validation, test split
@@ -97,8 +97,8 @@ if __name__ == "__main__":
             # 'seed': 9870112,
             }
 
-    np.random.seed(122333)
-    seeds = np.random.randint(low=0, high=1000000, size=3)
+    np.random.seed(9873866)
+    seeds = np.random.randint(low=0, high=1000000, size=1)
     # seeds = [199527]
     # seeds = [ 565625]
     os.mkdir('checkpoints/embedding_experiment/')

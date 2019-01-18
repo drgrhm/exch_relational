@@ -102,78 +102,87 @@ if __name__ == "__main__":
 
     np.random.seed(9873866)
 
-    embeddings = {}
-    embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
-    embeddings['course'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
-    embeddings['prof'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
 
-    num_alpha = max(4, opts['toy_data']['embedding_size'])
-    alpha = {'sc':2 * np.random.randn(num_alpha), 'sp':2 * np.random.randn(num_alpha), 'cp':2 * np.random.randn(num_alpha)}
-
-    # percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing
-
-    percent_observed = [1., .8, .6, .4, .2, .0]  # Must be decreasing
-
-    observed_sc = choose_observed(0, opts['toy_data']['size'][0:2], opts['toy_data']['sparsity'], min_observed=opts['toy_data']['min_observed'])
-
-    observed = [{}]
-    observed[0]['sc'] = observed_sc
-    observed[0]['sp'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][2]))
-    observed[0]['cp'] = np.ones((opts['toy_data']['size'][1], opts['toy_data']['size'][2]))
-
-    for i in range(1, len(percent_observed)):  # data matrices are percent_observed[i]% observed
-
-        p_prev = percent_observed[i - 1]
-        p = percent_observed[i]
-
-        p_keep = p / p_prev
-
-        observed.append({})
-        observed[i]['sc'] = observed_sc
-        observed[i]['sp'] = update_observed(observed[i - 1]['sp'], p_keep, min_observed=0)
-        observed[i]['cp'] = update_observed(observed[i - 1]['cp'], p_keep, min_observed=0)
-
-
-    percent_observed = percent_observed[1:]  # remove 1.0 from list, since some data must be unobserved to make predictions
-    observed = observed[1:]  # remove corresponding matrix
 
     checkpoints_folder = opts['checkpoints_folder']
     os.mkdir(checkpoints_folder + '/side_info_experiment')
 
-    losses_ts = []
-    losses_mean = []
+    n_runs = 5
+    for k in range(n_runs):
 
-    for i in range(len(percent_observed)):
+        print('######################## Run ', k, '########################')
 
-        print('===== Model ', i, '=====')
+        os.mkdir(checkpoints_folder + '/side_info_experiment/' + str(k))
 
-        opts['data'] = ToyDataLoader(opts['toy_data']['size'],
-                                     opts['toy_data']['sparsity'],
-                                     opts['split_sizes'],
-                                     opts['encoder_opts']['units_in'],
-                                     opts['toy_data']['embedding_size'],
-                                     opts['toy_data']['min_observed'],
-                                     embeddings=embeddings,
-                                     alpha=alpha,
-                                     observed=observed[i],
-                                     predict_unobserved=False)
+        embeddings = {}
+        embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
+        embeddings['course'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
+        embeddings['prof'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
 
-        opts['checkpoints_folder'] = checkpoints_folder + '/side_info_experiment/' + str(i)
-        os.mkdir(opts['checkpoints_folder'])
-        opts['save_model'] = True
+        num_alpha = max(4, opts['toy_data']['embedding_size'])
+        alpha = {'sc':2 * np.random.randn(num_alpha), 'sp':2 * np.random.randn(num_alpha), 'cp':2 * np.random.randn(num_alpha)}
 
-        if percent_observed[i] == 0.:
-            opts['encoder_opts']['side_info'] = False
-            opts['decoder_opts']['side_info'] = False
+        # percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing
 
-        loss_ts, loss_mean = main(opts)
-        losses_ts.append(loss_ts)
-        losses_mean.append(loss_mean)
+        percent_observed = [1., .8, .6, .4, .2, .0]  # Must be decreasing
 
-    path = os.path.join(checkpoints_folder, 'side_info_experiment', 'loss.npz')
-    file = open(path, 'wb')
-    np.savez(file, losses_ts=losses_ts, losses_mean=losses_mean)
-    file.close()
+        observed_sc = choose_observed(0, opts['toy_data']['size'][0:2], opts['toy_data']['sparsity'], min_observed=opts['toy_data']['min_observed'])
 
-    print("Test loss:\n", losses_ts)
-    print("Predict mean loss:\n", losses_mean)
+        observed = [{}]
+        observed[0]['sc'] = observed_sc
+        observed[0]['sp'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][2]))
+        observed[0]['cp'] = np.ones((opts['toy_data']['size'][1], opts['toy_data']['size'][2]))
+
+        for i in range(1, len(percent_observed)):  # data matrices are percent_observed[i]% observed
+
+            p_prev = percent_observed[i - 1]
+            p = percent_observed[i]
+
+            p_keep = p / p_prev
+
+            observed.append({})
+            observed[i]['sc'] = observed_sc
+            observed[i]['sp'] = update_observed(observed[i - 1]['sp'], p_keep, min_observed=0)
+            observed[i]['cp'] = update_observed(observed[i - 1]['cp'], p_keep, min_observed=0)
+
+
+        percent_observed = percent_observed[1:]  # remove 1.0 from list, since some data must be unobserved to make predictions
+        observed = observed[1:]  # remove corresponding matrix
+
+        losses_ts = []
+        losses_mean = []
+
+        for i in range(len(percent_observed)):
+
+            print('===== Model ', i, '=====')
+
+            opts['data'] = ToyDataLoader(opts['toy_data']['size'],
+                                         opts['toy_data']['sparsity'],
+                                         opts['split_sizes'],
+                                         opts['encoder_opts']['units_in'],
+                                         opts['toy_data']['embedding_size'],
+                                         opts['toy_data']['min_observed'],
+                                         embeddings=embeddings,
+                                         alpha=alpha,
+                                         observed=observed[i],
+                                         predict_unobserved=False)
+
+            opts['checkpoints_folder'] = checkpoints_folder + '/side_info_experiment/' + str(k) + '/'+ str(i)
+            os.mkdir(opts['checkpoints_folder'])
+            opts['save_model'] = True
+
+            if percent_observed[i] == 0.:
+                opts['encoder_opts']['side_info'] = False
+                opts['decoder_opts']['side_info'] = False
+
+            loss_ts, loss_mean = main(opts)
+            losses_ts.append(loss_ts)
+            losses_mean.append(loss_mean)
+
+        path = os.path.join(checkpoints_folder, 'side_info_experiment', 'loss.npz')
+        file = open(path, 'wb')
+        np.savez(file, losses_ts=losses_ts, losses_mean=losses_mean)
+        file.close()
+
+        print("Test loss:\n", losses_ts)
+        print("Predict mean loss:\n", losses_mean)
