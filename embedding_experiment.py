@@ -23,7 +23,7 @@ if __name__ == "__main__":
     auto_restore = False
     save_model = True
 
-    opts = {'epochs':20000,
+    opts = {'epochs':50000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1],  # train, validation, test split
@@ -91,13 +91,13 @@ if __name__ == "__main__":
             'restore_point_epoch':-1,
             'save_model':save_model,
             'save_frequency':1000,  # Save model every save_frequency epochs
-            'loss_save_tolerance':.0,  # If loss changes by more than loss_save_tolerance (as % of old value), save the model
+            'loss_save_improvement':.005,  # If loss changes by more than loss_save_tolerance (as % of old value), save the model
             # 'debug':True,  # Set random seeds or not
             # 'seed':9858776,
             # 'seed': 9870112,
             }
 
-    np.random.seed(9873866)
+    np.random.seed(9858776)
     seeds = np.random.randint(low=0, high=1000000, size=1)
     # seeds = [199527]
     # seeds = [ 565625]

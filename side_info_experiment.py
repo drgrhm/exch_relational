@@ -24,7 +24,7 @@ if __name__ == "__main__":
     auto_restore = False
     # save_model = False
 
-    opts = {'epochs':20000,
+    opts = {'epochs':50000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1], # train, validation, test split
@@ -94,14 +94,13 @@ if __name__ == "__main__":
             'restore_point_epoch':-1,
             # 'save_model':save_model,
             'save_frequency':1000000, # Save model every save_frequency epochs
-            'loss_save_tolerance':.0, # If loss changes by more than loss_save_tolerance (as % of old value), save the model
+            'loss_save_improvement':.005, # If loss changes by more than loss_save_tolerance since last save (as % of old value), save the model
             'debug':True, # Set random seeds or not
             'seed':9858776,
             # 'seed': 9870112,
             }
 
     np.random.seed(9873866)
-
 
 
     checkpoints_folder = opts['checkpoints_folder']
@@ -122,9 +121,7 @@ if __name__ == "__main__":
         num_alpha = max(4, opts['toy_data']['embedding_size'])
         alpha = {'sc':2 * np.random.randn(num_alpha), 'sp':2 * np.random.randn(num_alpha), 'cp':2 * np.random.randn(num_alpha)}
 
-        # percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing
-
-        percent_observed = [1., .8, .6, .4, .2, .0]  # Must be decreasing
+        percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing
 
         observed_sc = choose_observed(0, opts['toy_data']['size'][0:2], opts['toy_data']['sparsity'], min_observed=opts['toy_data']['min_observed'])
 
@@ -179,7 +176,7 @@ if __name__ == "__main__":
             losses_ts.append(loss_ts)
             losses_mean.append(loss_mean)
 
-        path = os.path.join(checkpoints_folder, 'side_info_experiment', 'loss.npz')
+        path = os.path.join(checkpoints_folder, 'side_info_experiment', str(k), 'loss.npz')
         file = open(path, 'wb')
         np.savez(file, losses_ts=losses_ts, losses_mean=losses_mean)
         file.close()

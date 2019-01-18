@@ -164,6 +164,8 @@ def main(opts, restore_point=None):
         loss_tr_best = math.inf
         loss_vl_best = math.inf
         loss_ts_vl_best = math.inf
+        loss_vl_last_save = math.inf
+        loss_improvement = math.inf
         loss_tr_best_ep = 0
         loss_vl_best_ep = 0
 
@@ -319,7 +321,8 @@ def main(opts, restore_point=None):
             losses_ts.append(loss_ts)
 
             if loss_vl < loss_vl_best:
-                # loss_improvement = (loss_vl_best - loss_vl) / loss_vl_best
+                if loss_vl_last_save < math.inf:
+                    loss_improvement = (loss_vl_last_save - loss_vl) / loss_vl_last_save
                 loss_vl_best = loss_vl
                 loss_ts_vl_best = loss_ts
                 loss_vl_best_ep = ep
@@ -329,8 +332,9 @@ def main(opts, restore_point=None):
                 prof_embeds_out_vl_best = prof_embeds_out_vl
 
                 ## save model when validation loss improves
-                # if loss_improvement > opts['loss_save_tolerance'] and opts['save_model']:
-                if opts['save_model']:
+                if opts['save_model'] and loss_improvement > opts['loss_save_improvement']:
+                    loss_vl_last_save = loss_vl
+                    print("-------  SAVING MODEL (loss improvement: {d) ------- ".format(loss_improvement))
                     model_path = os.path.join(opts['checkpoints_folder'], 'best.ckpt')
                     saver.save(sess, model_path)
 
@@ -416,7 +420,7 @@ if __name__ == "__main__":
     units_in = 1
     embedding_size_data = 2
     embedding_size_network = 2
-    units = 128
+    units = 64
     units_out = 1
 
     # activation = tf.nn.relu
@@ -427,17 +431,17 @@ if __name__ == "__main__":
     auto_restore = False
     save_model = True
 
-    opts = {'epochs':10000,
+    opts = {'epochs':50000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1], # train, validation, test split
             'noise_rate':dropout_rate,
             'regularization_rate':.00001,
             'learning_rate':.0001,
-            'toy_data':{'size':[200, 100, 50],
-                        'sparsity':.01,
+            'toy_data':{'size':[200, 200, 200],
+                        'sparsity':.1,
                         'embedding_size':embedding_size_data,
-                        'min_observed':2, # generate at least 2 entries per row and column (sparsity rate will be affected)
+                        'min_observed':5, # generate at least 2 entries per row and column (sparsity rate will be affected)
             },
             'encoder_opts':{'pool_mode':'mean',
                           'dropout_rate':dropout_rate,
@@ -492,12 +496,11 @@ if __name__ == "__main__":
             'checkpoints_folder':'checkpoints',
             'restore_point_epoch':-1,
             'save_model':save_model,
-            'save_frequency':500, # Save model every save_frequency epochs
-            'loss_save_tolerance':.01, # If loss changes by more than loss_save_tolerance (as % of old value), save the model
+            'save_frequency':5000000, # Save model every save_frequency epochs
+            'loss_save_improvement':.005, # If loss changes by more than loss_save_tolerance (as % of old value), save the model
             'debug':True, # Set random seeds or not
-            # 'seed':9858776,
+            'seed':9858776,
             # 'seed': 9870112,
-            'seed':73394,
             }
 
 
