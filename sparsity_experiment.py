@@ -32,10 +32,11 @@ if __name__ == "__main__":
                 'regularization_rate':.00001,
                 'learning_rate':.0001,
                 'evaluate_only':False,  # If True, don't train the model, just evaluate it
+                'calculate_loss':[True, False, False],  # Which tables do we calculate loss on.
                 'toy_data':{'size':[200, 200, 200],
                             # 'sparsity':1.,
                             'embedding_size':embedding_size_data,
-                            'min_observed':5, # generate at least 2 entries per row and column (sparsity rate will be affected)
+                            'min_observed':1, # generate at least 2 entries per row and column (sparsity rate will be affected)
                 },
                 'encoder_opts':{'pool_mode':'mean',
                               'dropout_rate':dropout_rate,
@@ -143,7 +144,6 @@ if __name__ == "__main__":
         os.mkdir(checkpoints_folder + '/sparsity_experiment/' + str(k))
 
         for i, p in enumerate(percent_observed):
-            # for j, q in enumerate(percent_training):
             print('===== Model building loop ', i, '=====')
 
             opts['auto_restore'] = False
@@ -173,9 +173,7 @@ if __name__ == "__main__":
         for i, p in enumerate(percent_observed):
             print('===== Prediction loop ', i, '=====')
 
-            # unobserved = {'sc': 1 - observed[i]['sc'], 'sp': 1 - observed[i]['sp'], 'cp': 1 - observed[i]['cp']}
             opts['toy_data']['sparsity'] = p
-
             opts['split_sizes'] = None
             opts['checkpoints_folder'] = checkpoints_folder + '/sparsity_experiment/' + str(k) + '/' + str(i)
             opts['data'] = ToyDataLoader(opts['toy_data']['size'],
@@ -196,18 +194,10 @@ if __name__ == "__main__":
 
             loss_ts[i], _ = main(opts, restore_point)
 
-            # path = os.path.join(opts['checkpoints_folder'], 'loss.npz')
-            # file = open(path, 'wb')
-            # np.savez(file, loss_ts=loss_ts, loss_mean=loss_mean)
-            # file.close()
-
         path = os.path.join(checkpoints_folder, 'sparsity_experiment', str(k), 'loss.npz')
         file = open(path, 'wb')
         np.savez(file, loss_ts=loss_ts, loss_mean=loss_mean)
         file.close()
-
-        # print("Test loss:\n", loss_ts)
-        # print("Predict mean loss:\n", loss_mean)
 
 
 

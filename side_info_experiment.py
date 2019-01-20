@@ -32,6 +32,7 @@ if __name__ == "__main__":
             'regularization_rate':.00001,
             'learning_rate':.0001,
             'evaluate_only':False,  # If True, don't train the model, just evaluate it
+            'calculate_loss':[True, False, False],  # Which tables do we calculate loss on.
             'toy_data':{'size':[200, 200, 200],
                         'sparsity':.1,
                         'embedding_size':embedding_size_data,

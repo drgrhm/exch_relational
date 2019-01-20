@@ -31,6 +31,7 @@ if __name__ == "__main__":
             'regularization_rate':.00001,
             'learning_rate':.0001,
             'evaluate_only':False,  # If True, don't train the model, just evaluate it
+            'calculate_loss':[True, True, True],  # Which tables do we calculate loss on.
             'toy_data':{'size':[200, 200, 200],
                         'sparsity':.1,
                         'embedding_size':embedding_size_data,
@@ -97,7 +98,7 @@ if __name__ == "__main__":
             # 'seed': 9870112,
             }
 
-    np.random.seed(9858776)
+    np.random.seed(9873866)
     seeds = np.random.randint(low=0, high=1000000, size=1)
     # seeds = [199527]
     # seeds = [ 565625]
