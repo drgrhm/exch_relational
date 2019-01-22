@@ -6,9 +6,12 @@ import glob
 
 if __name__ == "__main__":
 
+    np.set_printoptions(suppress=True, linewidth=np.nan, threshold=np.nan)
+
     # experiment = 'embedding'
-    experiment = 'sparsity'
+    # experiment = 'sparsity'
     # experiment = 'side_info'
+    experiment = 'sparsity_varied'
 
     ## Embeddings experiment
     if experiment == 'embedding':
@@ -73,30 +76,73 @@ if __name__ == "__main__":
         image_path = 'img/sparsity_experiment/'
 
         percent_observed = [.9, .8, .7, .6, .5, .4, .3, .2, .1]
+        num_runs = 4
 
-        loss_ts = np.zeros(len(percent_observed))
-        loss_mean = np.zeros(len(percent_observed))
+        loss_ts = np.zeros((num_runs, len(percent_observed)))
+        loss_mean = np.zeros((num_runs, len(percent_observed)))
 
-        num_runs = 5
         for k in range(num_runs):
-
             loss_file = open(checkpoint_path + str(k) + '/loss.npz', 'rb')
             loss_data = np.load(loss_file)
+            loss_ts[k, :] = np.array(loss_data['loss_ts'])
+            loss_mean[k, :] = np.array(loss_data['loss_mean'])
 
-            loss_ts += np.array(loss_data['loss_ts'])
-            loss_mean += np.array(loss_data['loss_mean'])
+        # for k in range(num_runs):
+        #     for i, _ in enumerate(percent_observed):
+        #         loss_file = open(checkpoint_path + str(k) + '/' + str(i) + '/loss.npz', 'rb')
+        #         loss_data = np.load(loss_file)
+        #         loss_ts[k, i] = np.array(loss_data['loss_ts_vl_best'])
+        #         loss_mean[k, i] = np.array(loss_data['loss_mean'])
 
-        loss_ts /= num_runs
-        loss_mean /= num_runs
+        colours_ts = ['#FF5733', '#33FFFF', '#7DFF33', '#3383FF', '#FC33FF']
+        colours_mn = ['#FFBFB1', '#BDFFFF', '#C8FFA9', '#98BFFC', '#FBACFC']
+        for k in range(num_runs):
 
-        plt.plot(percent_observed, loss_ts, '.-', color='blue')
-        plt.plot(percent_observed, loss_mean, '.-', color='red')
+            plt.plot(percent_observed, loss_ts[k, :], '.-', color=colours_ts[k])
+            plt.plot(percent_observed, loss_mean[k, :], '.-', color=colours_mn[k])
+
         plt.xticks(percent_observed)
-        plt.legend(('test loss', 'predict mean'))
         plt.title("Sparsity")
         plt.xlabel("Percent observed")
         plt.ylabel("Loss")
-        plt.savefig(image_path + 'loss_ts.pdf', bbox_inches='tight')
+        plt.savefig(image_path + 'sparsity_loss.pdf', bbox_inches='tight')
+        plt.clf()
+
+
+    # if experiment == 'side_info':
+    #     ## Sparsity experiment
+    #     checkpoint_path = 'checkpoints/side_info_experiment/'
+    #     image_path = 'img/side_info_experiment/'
+    #
+    #     percent_observed = [.9, .8, .7, .6, .5, .4, .3, .2, .1, .0]
+    #
+    #     num_runs = 4
+    #     loss_ts = np.zeros((num_runs, len(percent_observed)))
+    #     loss_mean = np.zeros((num_runs, len(percent_observed)))
+    #
+    #     for k in range(num_runs):
+    #         loss_file = open(checkpoint_path + str(k) + '/loss.npz', 'rb')
+    #         loss_data = np.load(loss_file)
+    #         loss_ts[k, :] = np.array(loss_data['losses_ts'])
+    #         loss_mean[k, :] = np.array(loss_data['losses_mean'])
+    #
+    #     uppers = []
+    #     lowers = []
+    #     means_ts = []
+    #     for j, p in enumerate(percent_observed):
+    #         obs_ts = list(loss_ts[:, j])
+    #         obs_ts.sort()
+    #         mean_ts = np.mean(loss_ts, axis=0)
+    #         means_ts.append(mean_ts)
+    #     # loss_diff = loss_ts / loss_mean
+    #     # for k in range(num_runs):
+    #     #     plt.plot(percent_observed, loss_diff[k, :], '.-')
+    #     #     plt.plot(percent_observed, loss_mean[k, :], '.-', color=colours_mn[k])
+    #     plt.xticks(percent_observed)
+    #     plt.title("Side-Info")
+    #     plt.xlabel("Percent observed (side tables)")
+    #     plt.ylabel("Loss")
+    #     plt.savefig(image_path + 'loss_ts.pdf', bbox_inches='tight')
 
 
     if experiment == 'side_info':
@@ -106,104 +152,90 @@ if __name__ == "__main__":
 
         percent_observed = [.9, .8, .7, .6, .5, .4, .3, .2, .1, .0]
 
-        loss_ts = np.zeros(len(percent_observed))
-        loss_mean = np.zeros(len(percent_observed))
-
         num_runs = 5
+        loss_ts = np.zeros((num_runs, len(percent_observed)))
+        loss_mean = np.zeros((num_runs, len(percent_observed)))
+
         for k in range(num_runs):
             loss_file = open(checkpoint_path + str(k) + '/loss.npz', 'rb')
             loss_data = np.load(loss_file)
-            loss_ts += np.array(loss_data['losses_ts'])
-            loss_mean += np.array(loss_data['losses_mean'])
+            loss_ts[k, :] = np.array(loss_data['losses_ts'])
+            loss_mean[k, :] = np.array(loss_data['losses_mean'])
 
-        loss_ts /= num_runs
-        loss_mean /= num_runs
 
-        plt.plot(percent_observed, loss_ts, '.-', color='blue')
-        plt.plot(percent_observed, loss_mean, '.-', color='red')
+        # colours_ts = ['#FF5733', '#33FFFF', '#7DFF33', '#3383FF', '#FC33FF']
+        # colours_mn = ['#FFBFB1', '#BDFFFF', '#C8FFA9', '#98BFFC', '#FBACFC']
+        # for k in range(num_runs):
+        #
+        #     plt.plot(percent_observed, loss_ts[k, :], '.-', color=colours_ts[k])
+        #     plt.plot(percent_observed, loss_mean[k, :], '.-', color=colours_mn[k])
+
+        plt.plot(percent_observed, np.mean(loss_ts, axis=0), '.-', color='blue')
+        plt.plot(percent_observed, np.mean(loss_mean, axis=0), '.-', color='red')
+
+        # # loss_diff = loss_ts / loss_mean
+        # loss_diff = loss_mean
+        #
+        # loss_diff = np.sort(loss_diff, axis=0)
+        # loss_mean = np.mean(loss_diff, axis=0)
+        #
+        # loss_up = []
+        # loss_lo = []
+        #
+        # for j, _ in enumerate(percent_observed):
+        #     d_up = loss_diff[-1, j] - loss_mean[j]
+        #     d_lo = loss_mean[j] - loss_diff[0, j]
+        #
+        #     if d_up > d_lo:
+        #         loss_up.append(max(loss_diff[-2, j], loss_mean[j]))
+        #         loss_lo.append(min(loss_diff[0, j], loss_mean[j]))
+        #     else:
+        #         loss_up.append(max(loss_diff[-1, j], loss_mean[j]))
+        #         loss_lo.append(min(loss_diff[1, j], loss_mean[j]))
+        #
+        # loss_up = np.array(loss_up)
+        # loss_lo = np.array(loss_lo)
+        #
+        # plt.plot(percent_observed, loss_mean, '.-', color='blue')
+        # plt.plot(percent_observed, loss_up, '.-', color='green')
+        # plt.plot(percent_observed, loss_lo, '.-', color='red')
+        # plt.fill_between(percent_observed, loss_lo, loss_up)
+
         plt.xticks(percent_observed)
-        plt.legend(('test loss', 'predict mean'))
         plt.title("Side-Info")
         plt.xlabel("Percent observed (side tables)")
         plt.ylabel("Loss")
-        plt.savefig(image_path + 'loss_ts.pdf', bbox_inches='tight')
+        plt.savefig(image_path + 'side_info_loss_mean.pdf', bbox_inches='tight')
 
 
+    if experiment == 'sparsity_varied':
+        ## Sparsity experiment
+        checkpoint_path = 'checkpoints/sparsity_varied_experiment/'
+        image_path = 'img/sparsity_varied_experiment/'
 
-    # if experiment == 'side_info':
-    #     checkpoint_path = 'checkpoints/side_info_experiment/'
-    #     image_path = 'img/side_info_experiment/'
-    #
-    #     # loss_file = open(checkpoint_path + 'loss.npz', 'rb')
-    #     # loss_data = np.load(loss_file)
-    #     #
-    #     # losses_ts = loss_data['losses_ts']
-    #     # losses_mean = loss_data['losses_mean']
-    #     #
-    #     # ll = (losses_mean - losses_ts) / losses_mean
-    #
-    #     # plt.plot(range(losses_ts.shape[0]), ll, '.-', color='blue')
-    #     # plt.plot(range(losses_mean.shape[0]), losses_mean, '.-', color='red')
-    #     # plt.legend(('test loss', 'predict mean'))
-    #     #
-    #     # plt.savefig(image_path + 'loss_ts.pdf', bbox_inches='tight')
-    #
-    #     # percent_observed = [.9, .8, .7, .6, .5, .4, .3, .2, .1, .0]
-    #
-    #     percent_observed = [.8, .0]  # Must be decreasing
-    #
-    #     losses = {}
-    #     n_runs = 3
-    #
-    #     for i, p in enumerate(percent_observed):
-    #         # losses[i] = {'test':0, 'mean':0}
-    #         losses[i] = {'test':[], 'mean':[]}
-    #         for k in range(n_runs):
-    #             checkpoint_path = 'checkpoints/side_info_experiment/' + str(k) + '/' + str(i) + '/'
-    #             loss_file = open(checkpoint_path + 'loss.npz', 'rb')
-    #
-    #             loss_data = np.load(loss_file)
-    #
-    #             losses[i]['test'].append(loss_data['loss_ts_vl_best'])
-    #             losses[i]['mean'].append(loss_data['loss_mean'])
-    #
-    #             # losses_tr = loss_data['losses_tr']
-    #             # losses_vl = loss_data['losses_vl']
-    #             # loss_mean = loss_data['loss_mean']
-    #             # losses_mean = loss_mean * np.ones_like(losses_tr)
-    #
-    #             # plt.plot(range(losses_tr.shape[0]), losses_tr, '.-', color='green')
-    #             # plt.plot(range(losses_vl.shape[0]), losses_vl, '.-', color='blue')
-    #             # plt.plot(range(losses_vl.shape[0]), losses_mean, '.-', color='red')
-    #             # plt.legend(('training loss', 'validation loss', 'predict mean'))
-    #             #
-    #             # plt.savefig(image_path + 'loss_ts_' + str(i) + '.pdf', bbox_inches='tight')
-    #
-    #     ii = 0
-    #     # n_runs = 5
-    #     # for k in range(n_runs):
-    #     #
-    #     #
-    #     #     percent_observed = [1., .8, .6, .4, .2, .0]  # Must be decreasing
-    #     #
-    #     #
-    #     #     for i, p in enumerate(percent_observed):
-    #     #         checkpoint_path = 'checkpoints/side_info_experiment/' + str(k) + '/' + str(i) + '/'
-    #     #
-    #     #         loss_file = open(checkpoint_path + 'loss.npz', 'rb')
-    #     #         loss_data = np.load(loss_file)
-    #     #
-    #     #         losses_tr = loss_data['losses_tr']
-    #     #         losses_vl = loss_data['losses_vl']
-    #     #         loss_mean = loss_data['loss_mean']
-    #     #         losses_mean = loss_mean * np.ones_like(losses_tr)
-    #     #
-    #     #         plt.plot(range(losses_tr.shape[0]), losses_tr, '.-', color='green')
-    #     #         plt.plot(range(losses_vl.shape[0]), losses_vl, '.-', color='blue')
-    #     #         plt.plot(range(losses_vl.shape[0]), losses_mean, '.-', color='red')
-    #     #         plt.legend(('training loss', 'validation loss', 'predict mean'))
-    #     #
-    #     #         plt.savefig(image_path + 'loss_ts_' + str(i) + '.pdf', bbox_inches='tight')
+        percent_observed = [.9, .8, .7, .6, .5, .4, .3, .2, .1]
+        num_runs = 3
 
+        # loss_ts = np.zeros((num_runs, len(percent_observed), len(percent_observed)))
+        # loss_mean = np.zeros((num_runs, len(percent_observed), len(percent_observed)))
 
+        loss_ts_ave = np.zeros((len(percent_observed), len(percent_observed)))
+        loss_mean_ave = np.zeros((len(percent_observed), len(percent_observed)))
 
+        for k in range(num_runs):
+            loss_file = open(checkpoint_path + 'run_{:d}_loss_varied.npz'.format(k), 'rb')
+            loss_data = np.load(loss_file)
+            loss_ts = loss_data['loss_ts']
+            loss_mean = loss_data['loss_mean']
+
+            loss_ts_ave += loss_ts
+            loss_mean_ave += loss_mean
+
+        loss_ts_ave /= num_runs
+        loss_mean_ave /= num_runs
+
+        aa = 1
+
+            # plt.imshow(loss_mean - loss_ts, cmap='hot', interpolation='nearest')
+            # plt.savefig(image_path + 'mean_loss.pdf', bbox_inches='tight')
+            # plt.clf()

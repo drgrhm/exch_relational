@@ -14,7 +14,6 @@ if __name__ == "__main__":
     embedding_size_data = 2
     embedding_size_network = 2
 
-
     # activation = tf.nn.relu
     activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
     dropout_rate = 0.00002

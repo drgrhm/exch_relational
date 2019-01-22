@@ -120,6 +120,7 @@ class ToyDataLoader:
         self._min_observed = min_observed
         self._observed = observed
         self._predict_unobserved = predict_unobserved
+        # self._unobserved = unobserved
 
         if alpha is None:
             self._alpha = {'sc':None, 'sp':None, 'cp':None}
@@ -164,7 +165,7 @@ class ToyDataLoader:
         return {'student_course': table_sc, 'student_prof':table_sp, 'course_prof':table_cp}
 
 
-    def _make_table(self, row_embeds, col_embeds, tid, observed=None, alpha=None):
+    def _make_table(self, row_embeds, col_embeds, tid, observed=None, unobserved=None, alpha=None):
 
         assert row_embeds.shape[1] == col_embeds.shape[1]
 
@@ -187,12 +188,23 @@ class ToyDataLoader:
             raise Exception('invalid embedding size')
 
         if observed is None:
+            assert unobserved is None, "Observed is None, but unobserved is not None..."
             observed = choose_observed(tid, shape, self._sparsity, min_observed=self._min_observed)
 
         if self._predict_unobserved:
             inds = np.array(np.nonzero(np.ones((n_rows, n_cols)))).T
             vals = tab.flatten()
             split = 1. - observed.flatten()
+        # elif unobserved is not None:
+        #
+        #     inds = np.array(np.nonzero(observed + unobserved)).T
+        #     vals = tab.flatten()[observed.flatten() == 1]
+        #     # n = inds.shape[0]
+        #     # n_tr = int(n * self._split_sizes[0])
+        #
+        #     # split = np.concatenate((np.zeros(n_tr), np.ones(n - n_tr), 2*np.ones))
+        #
+        #     split = np.concatenate((np.zeros_like(observed.flatten()), np.ones_like(unobserved.flatten())))
         else:
             inds = np.array(np.nonzero(observed)).T
             vals = tab.flatten()[observed.flatten() == 1]
