@@ -99,7 +99,8 @@ if __name__ == "__main__":
                 'seed': 9870112,
                 }
 
-    np.random.seed(9873866)
+    # np.random.seed(9873866)
+    np.random.seed(988777)
 
     checkpoints_folder = opts['checkpoints_folder']
     os.mkdir(checkpoints_folder + '/sparsity_experiment')
