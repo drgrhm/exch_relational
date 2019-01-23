@@ -32,7 +32,7 @@ if __name__ == "__main__":
             'regularization_rate':.00001,
             'learning_rate':.0001,
             'evaluate_only':False,  # If True, don't train the model, just evaluate it
-            'calculate_loss':[True, False, False],  # Which tables do we calculate loss on.
+            'calculate_loss':[True, True, True],  # Which tables do we calculate loss on.
             'toy_data':{'size':[200, 200, 200],
                         'sparsity':.1,
                         'embedding_size':embedding_size_data,
@@ -101,7 +101,7 @@ if __name__ == "__main__":
             # 'seed': 9870112,
             }
 
-    np.random.seed(9873866)
+    np.random.seed(9988777)
 
 
     checkpoints_folder = opts['checkpoints_folder']
@@ -122,7 +122,8 @@ if __name__ == "__main__":
         num_alpha = max(4, opts['toy_data']['embedding_size'])
         alpha = {'sc':2 * np.random.randn(num_alpha), 'sp':2 * np.random.randn(num_alpha), 'cp':2 * np.random.randn(num_alpha)}
 
-        percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing
+        # percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing
+        percent_observed = [1., .5, .1, .0]  # Must be decreasing
 
         observed_sc = choose_observed(0, opts['toy_data']['size'][0:2], opts['toy_data']['sparsity'], min_observed=opts['toy_data']['min_observed'])
 

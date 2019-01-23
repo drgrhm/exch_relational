@@ -237,7 +237,7 @@ def main(opts, restore_point=None):
             if student_prof['calculate_loss']:
                 split_eval_sp = 1. * (data.tables['student_prof'].split == 1)
             else:
-                split_eval_sp = np.zeros_like(data.tables['student_course'].split == 1)
+                split_eval_sp = np.zeros_like(data.tables['student_prof'].split == 1)
             vals_eval_sp = data.tables['student_prof'].values_all * (split_eval_sp == 0)
 
             if course_prof['calculate_loss']:
