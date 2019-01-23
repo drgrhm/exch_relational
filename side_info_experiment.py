@@ -24,7 +24,7 @@ if __name__ == "__main__":
     auto_restore = False
     # save_model = False
 
-    opts = {'epochs':50000,
+    opts = {'epochs':75000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1], # train, validation, test split
