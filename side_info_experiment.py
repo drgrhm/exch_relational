@@ -18,13 +18,13 @@ if __name__ == "__main__":
 
     # activation = tf.nn.relu
     activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
-    dropout_rate = 0.2
+    dropout_rate = 0.4
     skip_connections = True
 
     auto_restore = False
     # save_model = False
 
-    opts = {'epochs':75000,
+    opts = {'epochs':50000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1], # train, validation, test split
@@ -101,7 +101,7 @@ if __name__ == "__main__":
             # 'seed': 9870112,
             }
 
-    np.random.seed(9988777)
+    np.random.seed(9840112)
 
 
     checkpoints_folder = opts['checkpoints_folder']

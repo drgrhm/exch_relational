@@ -268,6 +268,7 @@ def main(opts, restore_point=None):
                                                                                                          course_embeds_vl,
                                                                                                          prof_embeds_vl], feed_dict=eval_dict)
             return loss_eval, loss_mean
+            # return loss_eval, loss_mean, student_embeds_out_eval, course_embeds_out_eval, prof_embeds_out_eval
 
         if student_course['calculate_loss']:
             split_vl_sc = data.tables['student_course'].split[data.tables['student_course'].split <= 1]
@@ -425,14 +426,13 @@ def main(opts, restore_point=None):
                 else:
                     split_ts_sc = np.zeros_like(data.tables['student_course'].split == 2)
                 vals_ts_sc = data.tables['student_course'].values_all * (split_ts_sc == 0)
-
-                if student_prof['calculate_loss']:
+                if student_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
                     split_ts_sp = 1. * (data.tables['student_prof'].split == 2)
                 else:
                     split_ts_sp = np.zeros_like(data.tables['student_prof'].split == 2)
                 vals_ts_sp = data.tables['student_prof'].values_all * (split_ts_sp == 0)
 
-                if course_prof['calculate_loss']:
+                if course_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
                     split_ts_cp = 1. * (data.tables['course_prof'].split == 2)
                 else:
                     split_ts_cp = np.zeros_like(data.tables['course_prof'].split == 2)

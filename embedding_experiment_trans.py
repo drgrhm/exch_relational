@@ -2,6 +2,8 @@ import os
 import numpy as np
 from main import main
 import tensorflow as tf
+from util import plot_embeddings, gaussian_embeddings
+from data_util import ToyDataLoader
 from layers import ExchangeableLayer, FeatureDropoutLayer, PoolingLayer
 
 if __name__ == "__main__":
@@ -16,15 +18,7 @@ if __name__ == "__main__":
 
     # activation = tf.nn.relu
     activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
-
-
-
-    #########
     dropout_rate = 0.2
-
-
-
-
     skip_connections = True
 
     auto_restore = False
@@ -33,12 +27,12 @@ if __name__ == "__main__":
     opts = {'epochs':50000,
             'data_folder':'data',
             'data_set':data_set,
-            'split_sizes':[.8, .1, .1],  # train, validation, test split
+            'split_sizes':[.8, .2, 0],  # train, validation, test split
             'noise_rate':dropout_rate,
             'regularization_rate':.00001,
             'learning_rate':.0001,
             'evaluate_only':False,  # If True, don't train the model, just evaluate it
-            'calculate_loss':[True, True, True],  # Which tables do we calculate loss on.
+            'calculate_loss':[True, False, False],  # Which tables do we calculate loss on.
             'toy_data':{'size':[200, 200, 200],
                         'sparsity':.1,
                         'embedding_size':embedding_size_data,
@@ -105,22 +99,56 @@ if __name__ == "__main__":
             # 'seed': 9870112,
             }
 
-    np.random.seed(9988777)
-    seeds = np.random.randint(low=0, high=1000000, size=1)
+    # np.random.seed(9988777)
+    # seeds = np.random.randint(low=0, high=1000000, size=1)
     # seeds = [199527]
-    # seeds = [ 565625]
-    os.mkdir('checkpoints/embedding_experiment/')
+    seeds = [386327]
+    # os.mkdir('checkpoints/embedding_experiment/')
 
     for seed in seeds:
 
         print('===== Seed ', seed, '=====')
 
-        path_cpt = 'checkpoints/embedding_experiment/' + str(seed)
-        os.mkdir(path_cpt)
+        path_cpt = 'checkpoints/embedding_experiment_trans/' + str(seed)
+        # os.mkdir(path_cpt)
+
+        image_path = 'img/embedding_experiment_trans/'
 
         opts['debug'] = True
-        opts['seed'] = seed
+        opts['seed'] = 1223334444
         opts['checkpoints_folder'] = path_cpt
+        opts['auto_restore'] = True
+        restore_point = opts['checkpoints_folder'] + '/best.ckpt'
+        opts['evaluate_only'] = True
+        opts['save_model'] = False
 
-        main(opts)
+        np.random.seed(opts['seed'])
+
+        embeddings = {}
+        embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
+        embeddings['course'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
+        embeddings['prof'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
+
+
+        opts['data'] = ToyDataLoader(opts['toy_data']['size'],
+                                                 opts['toy_data']['sparsity'],
+                                                 opts['split_sizes'],
+                                                 opts['encoder_opts']['units_in'],
+                                                 opts['toy_data']['embedding_size'],
+                                                 opts['toy_data']['min_observed'],
+                                                 embeddings=embeddings)
+
+        _, _, student_embeds, course_embeds, prof_embeds = main(opts, restore_point)
+
+
+        # embeds_file = open(path_cpt + '/embeddings_vl_best.npz', 'rb')
+        # embeds_data = np.load(embeds_file)
+        #
+        # embeds_s = embeds_data['student_embeds_in']
+        # embeds_c = embeds_data['course_embeds_in']
+        # embeds_p = embeds_data['prof_embeds_in']
+
+        plot_embeddings(embeddings['student'], np.squeeze(student_embeds), image_path + 'student_embeddings_inductive.pdf')
+        plot_embeddings(embeddings['course'], np.squeeze(course_embeds), image_path + 'course_embeddings_inductive.pdf')
+        plot_embeddings(embeddings['prof'], np.squeeze(prof_embeds), image_path + 'prof_embeddings_inductive.pdf')
 

@@ -16,9 +16,9 @@ if __name__ == "__main__":
     ## Embeddings experiment
     if experiment == 'embedding':
 
-        np.random.seed(9873866)
-        seeds = np.random.randint(low=0, high=1000000, size=1)
-        # seeds = [199527]
+        # np.random.seed(9873866)
+        # seeds = np.random.randint(low=0, high=1000000, size=1)
+        seeds = [386327]
         for seed in seeds:
 
             image_path = 'img/embedding_experiment/' + str(seed) + '/'
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
             loss_file.close()
 
-            epochs = [int(s.split('_')[-1].split('.')[0]) for s in sorted(glob.glob(checkpoint_path + "embeddings_*.npz"))[:-1]] # Todo it would be better to save the 'save epochs' in a list as well than to do this:
+            epochs = [int(s.split('_')[-1].split('.')[0]) for s in sorted(glob.glob(checkpoint_path + "embeddings_*.npz"))[:-1]]
 
             for i, epoch in enumerate(epochs):
 
@@ -52,22 +52,22 @@ if __name__ == "__main__":
                 predicts_vl_s = np.squeeze(embeds_data['student_embeds_out_vl_best'])
                 predicts_vl_p = np.squeeze(embeds_data['prof_embeds_out_vl_best'])
 
-                predicts_tr_c = np.squeeze(embeds_data['course_embeds_out_tr_best'])
-                predicts_tr_s = np.squeeze(embeds_data['student_embeds_out_tr_best'])
-                predicts_tr_p = np.squeeze(embeds_data['prof_embeds_out_tr_best'])
+                # predicts_tr_c = np.squeeze(embeds_data['course_embeds_out_tr_best'])
+                # predicts_tr_s = np.squeeze(embeds_data['student_embeds_out_tr_best'])
+                # predicts_tr_p = np.squeeze(embeds_data['prof_embeds_out_tr_best'])
 
-                plot_embeddings(embeds_s, predicts_tr_s, image_path + 'student_embeddings_tr_{:05d}.pdf'.format(epoch), title='Epoch {:d}'.format(epoch))
-                plot_embeddings(embeds_c, predicts_tr_c, image_path + 'course_embeddings_tr_{:05d}.pdf'.format(epoch))
-                plot_embeddings(embeds_p, predicts_tr_p, image_path + 'prof_embeddings_tr_{:05d}.pdf'.format(epoch))
+                # plot_embeddings(embeds_s, predicts_tr_s, image_path + 'student_embeddings_tr_{:05d}.pdf'.format(epoch).format(epoch))
+                # plot_embeddings(embeds_c, predicts_tr_c, image_path + 'course_embeddings_tr_{:05d}.pdf'.format(epoch))
+                # plot_embeddings(embeds_p, predicts_tr_p, image_path + 'prof_embeddings_tr_{:05d}.pdf'.format(epoch))
 
-                plot_embeddings(embeds_s, predicts_vl_s, image_path + 'student_embeddings_vl_{:05d}.pdf'.format(epoch), title='Epoch {:d}'.format(epoch))
+                plot_embeddings(embeds_s, predicts_vl_s, image_path + 'student_embeddings_vl_{:05d}.pdf'.format(epoch))
                 plot_embeddings(embeds_c, predicts_vl_c, image_path + 'course_embeddings_vl_{:05d}.pdf'.format(epoch))
                 plot_embeddings(embeds_p, predicts_vl_p, image_path + 'prof_embeddings_vl_{:05d}.pdf'.format(epoch))
 
                 if i == 0:
-                    plot_embeddings(embeds_s, np.squeeze(embeds_data['student_embeds_init']), image_path + 'student_embeddings__init.pdf', title='Init')
-                    plot_embeddings(embeds_c, np.squeeze(embeds_data['course_embeds_init']), image_path + 'course_embeddings__init.pdf', title='Init')
-                    plot_embeddings(embeds_p, np.squeeze(embeds_data['prof_embeds_init']), image_path + 'prof_embeddings__init.pdf', title='Init')
+                    plot_embeddings(embeds_s, np.squeeze(embeds_data['student_embeds_init']), image_path + 'student_embeddings__init.pdf', xlabel='$(a)$')
+                    plot_embeddings(embeds_c, np.squeeze(embeds_data['course_embeds_init']), image_path + 'course_embeddings__init.pdf', xlabel='$(a)$')
+                    plot_embeddings(embeds_p, np.squeeze(embeds_data['prof_embeds_init']), image_path + 'prof_embeddings__init.pdf', xlabel='$(a)$')
 
 
     if experiment == 'sparsity':
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         image_path = 'img/sparsity_experiment/'
 
         percent_observed = [.9, .8, .7, .6, .5, .4, .3, .2, .1]
-        num_runs = 4
+        num_runs = 2
 
         loss_ts = np.zeros((num_runs, len(percent_observed)))
         loss_mean = np.zeros((num_runs, len(percent_observed)))
@@ -150,9 +150,11 @@ if __name__ == "__main__":
         checkpoint_path = 'checkpoints/side_info_experiment/'
         image_path = 'img/side_info_experiment/'
 
-        percent_observed = [.9, .8, .7, .6, .5, .4, .3, .2, .1, .0]
+        # percent_observed = [.9, .8, .7, .6, .5, .4, .3, .2, .1, .0]
+        # percent_observed = [.5, .1, .0]
+        percent_observed = [.5, .1, .0]
 
-        num_runs = 5
+        num_runs = 2
         loss_ts = np.zeros((num_runs, len(percent_observed)))
         loss_mean = np.zeros((num_runs, len(percent_observed)))
 
@@ -163,21 +165,39 @@ if __name__ == "__main__":
             loss_mean[k, :] = np.array(loss_data['losses_mean'])
 
 
-        # colours_ts = ['#FF5733', '#33FFFF', '#7DFF33', '#3383FF', '#FC33FF']
-        # colours_mn = ['#FFBFB1', '#BDFFFF', '#C8FFA9', '#98BFFC', '#FBACFC']
+        colours_ts = ['#FF5733', '#33FFFF', '#7DFF33', '#3383FF', '#FC33FF']
+        colours_mn = ['#FFBFB1', '#BDFFFF', '#C8FFA9', '#98BFFC', '#FBACFC']
         # for k in range(num_runs):
         #
         #     plt.plot(percent_observed, loss_ts[k, :], '.-', color=colours_ts[k])
-        #     plt.plot(percent_observed, loss_mean[k, :], '.-', color=colours_mn[k])
+        #     plt.plot(percent_observed, loss_mean[k, :], '.-', color=colours_mn[k], alpha=.3)
 
         plt.plot(percent_observed, np.mean(loss_ts, axis=0), '.-', color='blue')
         plt.plot(percent_observed, np.mean(loss_mean, axis=0), '.-', color='red')
 
-        # # loss_diff = loss_ts / loss_mean
-        # loss_diff = loss_mean
-        #
+
+        # loss_mn = np.mean(loss_mean, axis=0)
+
+
+
+        # loss_up = loss_mean[-2, :]
+        # loss_lo = loss_mean[1, :]
+
+        # plt.plot(percent_observed, loss_mn, '.-', color='blue')
+        # plt.plot(percent_observed, loss_up, '.-', color='green')
+        # plt.plot(percent_observed, loss_lo, '.-', color='red')
+        # plt.fill_between(percent_observed, loss_lo, loss_up)
+
+        plt.xticks(percent_observed)
+        plt.title("Side-Info")
+        plt.xlabel("Percent observed (side tables)")
+        plt.ylabel("Loss")
+        plt.savefig(image_path + 'side_info_loss_mean.pdf', bbox_inches='tight')
+
+
+        # loss_diff = loss_mean - loss_ts
         # loss_diff = np.sort(loss_diff, axis=0)
-        # loss_mean = np.mean(loss_diff, axis=0)
+        # loss_mean = np.mean(loss_mean, axis=0)
         #
         # loss_up = []
         # loss_lo = []
@@ -200,12 +220,12 @@ if __name__ == "__main__":
         # plt.plot(percent_observed, loss_up, '.-', color='green')
         # plt.plot(percent_observed, loss_lo, '.-', color='red')
         # plt.fill_between(percent_observed, loss_lo, loss_up)
-
-        plt.xticks(percent_observed)
-        plt.title("Side-Info")
-        plt.xlabel("Percent observed (side tables)")
-        plt.ylabel("Loss")
-        plt.savefig(image_path + 'side_info_loss_mean.pdf', bbox_inches='tight')
+        #
+        # plt.xticks(percent_observed)
+        # plt.title("Side-Info")
+        # plt.xlabel("Percent observed (side tables)")
+        # plt.ylabel("Loss")
+        # plt.savefig(image_path + 'side_info_loss_mean.pdf', bbox_inches='tight')
 
 
     if experiment == 'sparsity_varied':
@@ -214,7 +234,7 @@ if __name__ == "__main__":
         image_path = 'img/sparsity_varied_experiment/'
 
         percent_observed = [.9, .8, .7, .6, .5, .4, .3, .2, .1]
-        num_runs = 3
+        num_runs = 1
 
         # loss_ts = np.zeros((num_runs, len(percent_observed), len(percent_observed)))
         # loss_mean = np.zeros((num_runs, len(percent_observed), len(percent_observed)))
@@ -222,7 +242,8 @@ if __name__ == "__main__":
         loss_ts_ave = np.zeros((len(percent_observed), len(percent_observed)))
         loss_mean_ave = np.zeros((len(percent_observed), len(percent_observed)))
 
-        for k in range(num_runs):
+        # for k in range(num_runs):
+        for k in [0]:
             loss_file = open(checkpoint_path + 'run_{:d}_loss_varied.npz'.format(k), 'rb')
             loss_data = np.load(loss_file)
             loss_ts = loss_data['loss_ts']
@@ -234,8 +255,10 @@ if __name__ == "__main__":
         loss_ts_ave /= num_runs
         loss_mean_ave /= num_runs
 
-        aa = 1
+
 
             # plt.imshow(loss_mean - loss_ts, cmap='hot', interpolation='nearest')
             # plt.savefig(image_path + 'mean_loss.pdf', bbox_inches='tight')
             # plt.clf()
+
+

@@ -101,29 +101,27 @@ if __name__ == "__main__":
 
     np.random.seed(1122333)
 
-    percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1]  # Must be decreasing
+    # percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1]  # Must be decreasing
+    #
+    # observed_new = [{}]
+    # observed_new[0]['sc'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][1]))
+    # observed_new[0]['sp'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][2]))
+    # observed_new[0]['cp'] = np.ones((opts['toy_data']['size'][1], opts['toy_data']['size'][2]))
+    # for i in range(1, len(percent_observed)):  # data matrices are percent_observed[i]% observed
+    #
+    #     p_prev = percent_observed[i - 1]
+    #     p = percent_observed[i]
+    #
+    #     p_keep = p / p_prev
+    #
+    #     # observed_new.append({})
+    #     observed_new[i]['sc'] = update_observed(observed_new[i - 1]['sc'], p_keep, opts['toy_data']['min_observed'])
+    #     observed_new[i]['sp'] = update_observed(observed_new[i - 1]['sp'], p_keep, opts['toy_data']['min_observed'])
+    #     observed_new[i]['cp'] = update_observed(observed_new[i - 1]['cp'], p_keep, opts['toy_data']['min_observed'])
+    #
+    # percent_observed = percent_observed[1:]  # remove 1.0 from list, since some data must be unobserved to make predictions
+    # observed_new = observed_new[1:]  # remove corresponding matrix
 
-    observed_new = [{}]
-    observed_new[0]['sc'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][1]))
-    observed_new[0]['sp'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][2]))
-    observed_new[0]['cp'] = np.ones((opts['toy_data']['size'][1], opts['toy_data']['size'][2]))
-    for i in range(1, len(percent_observed)):  # data matrices are percent_observed[i]% observed
-
-        p_prev = percent_observed[i - 1]
-        p = percent_observed[i]
-
-        p_keep = p / p_prev
-
-        observed_new.append({})
-        observed_new[i]['sc'] = update_observed(observed_new[i - 1]['sc'], p_keep, opts['toy_data']['min_observed'])
-        observed_new[i]['sp'] = update_observed(observed_new[i - 1]['sp'], p_keep, opts['toy_data']['min_observed'])
-        observed_new[i]['cp'] = update_observed(observed_new[i - 1]['cp'], p_keep, opts['toy_data']['min_observed'])
-
-    percent_observed = percent_observed[1:]  # remove 1.0 from list, since some data must be unobserved to make predictions
-    observed_new = observed_new[1:]  # remove corresponding matrix
-
-
-    np.random.seed(9873866)
 
     checkpoints_folder = opts['checkpoints_folder']
 
@@ -131,9 +129,24 @@ if __name__ == "__main__":
     loss_ts = np.zeros((n_runs, 9, 9))
     loss_mean = np.zeros((n_runs, 9, 9))
 
-    for k in range(n_runs):
+
+    #########
+    transductive = False
+
+    if transductive:
+        np.random.seed(9873866)
+        seeds = np.random.randint(low=0, high=1000000, size=n_runs)
+    else:
+        np.random.seed(9858776)
+
+    # observed_new = []
+    # for k in range(n_runs):
+    for k in [1]:
 
         print('######################## Run ', k, '########################')
+
+        if transductive:
+            np.random.seed(seeds[k])
 
         percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1]  # Must be decreasing
 
@@ -164,13 +177,13 @@ if __name__ == "__main__":
         percent_observed = percent_observed[1:] # remove 1.0 from list, since some data must be unobserved to make predictions
         observed = observed[1:] # remove corresponding matrix
 
-        # observed_new = []
+        # observed_new.append({})
 
-        for i, p in enumerate(percent_observed):
+        for i, p in enumerate(percent_observed): # training sparsity level
 
                 print('========== Observed loop ', i, '==========')
 
-                observed_new.append({})
+
                 count_sc = observed[i]['sc'].shape[0] * observed[i]['sc'].shape[1]
                 count_sp = observed[i]['sp'].shape[0] * observed[i]['sp'].shape[1]
                 count_cp = observed[i]['cp'].shape[0] * observed[i]['cp'].shape[1]
@@ -180,48 +193,73 @@ if __name__ == "__main__":
 
                 for j, q in enumerate(percent_observed):
 
-                    # if j >= i:
+                    if j < i:
 
-                    print('===== Predict loop ', j, '=====')
+                        print('===== Predict loop ', j, '=====') # prediction sparsity level
 
-                    # observed_new[i]['sc'] = update_observed(observed[i]['sc'], q / p, opts['toy_data']['min_observed'])
-                    # observed_new[i]['sp'] = update_observed(observed[i]['sp'], q / p, opts['toy_data']['min_observed'])
-                    # observed_new[i]['cp'] = update_observed(observed[i]['cp'], q / p, opts['toy_data']['min_observed'])
+                        # observed_new[i]['sc'] = update_observed(observed[i]['sc'], q / p, opts['toy_data']['min_observed'])
+                        # observed_new[i]['sp'] = update_observed(observed[i]['sp'], q / p, opts['toy_data']['min_observed'])
+                        # observed_new[i]['cp'] = update_observed(observed[i]['cp'], q / p, opts['toy_data']['min_observed'])
 
-                    opts['toy_data']['sparsity'] = q
+                        observed_new = {}
+                        predict = {}
+                        observed_new['sc'] = np.zeros_like(observed[-1]['sc'])
+                        observed_new['sc'][np.nonzero(observed[-1]['sc'])] = 1
+                        observed_new['sc'][np.nonzero(observed[j]['sc'])] = 1
 
-                    opts['data'] = ToyDataLoader(opts['toy_data']['size'],
-                                                 opts['toy_data']['sparsity'],
-                                                 opts['split_sizes'],
-                                                 opts['encoder_opts']['units_in'],
-                                                 opts['toy_data']['embedding_size'],
-                                                 opts['toy_data']['min_observed'],
-                                                 embeddings=embeddings,
-                                                 # alpha=alpha,
-                                                 alpha=None,
-                                                 observed=observed_new[j],
-                                                 predict_unobserved=True)
-                    opts['auto_restore'] = True
-                    restore_point = opts['checkpoints_folder'] + '/best.ckpt'
-                    opts['evaluate_only'] = True
-                    opts['save_model'] = False
+                        observed_new['sp'] = np.zeros_like(observed[-1]['sp'])
+                        observed_new['sp'][np.nonzero(observed[-1]['sp'])] = 1
+                        observed_new['sp'][np.nonzero(observed[j]['sp'])] = 1
 
-                    loss_ts[k, i, j], loss_mean[k, i, j] = main(opts, restore_point)
+                        observed_new['cp'] = np.zeros_like(observed[-1]['cp'])
+                        observed_new['cp'][np.nonzero(observed[-1]['cp'])] = 1
+                        observed_new['cp'][np.nonzero(observed[j]['cp'])] = 1
+
+                        predict['sc'] = observed[-1]['sc']
+                        predict['sp'] = observed[-1]['sp']
+                        predict['cp'] = observed[-1]['cp']
+
+                        opts['toy_data']['sparsity'] = q
+
+                        opts['data'] = ToyDataLoader(opts['toy_data']['size'],
+                                                     opts['toy_data']['sparsity'],
+                                                     opts['split_sizes'],
+                                                     opts['encoder_opts']['units_in'],
+                                                     opts['toy_data']['embedding_size'],
+                                                     opts['toy_data']['min_observed'],
+                                                     embeddings=embeddings,
+                                                     # alpha=alpha,
+                                                     alpha=None,
+                                                     observed=observed_new,
+                                                     predict_unobserved=False,
+                                                     predict=predict)
+                        opts['auto_restore'] = True
+                        restore_point = opts['checkpoints_folder'] + '/best.ckpt'
+                        opts['evaluate_only'] = True
+                        opts['save_model'] = False
+
+                        loss_ts[k, i, j], loss_mean[k, i, j] = main(opts, restore_point)
+
         print(loss_ts[k,:,:])
         print(loss_mean[k, :, :])
 
-        path = os.path.join(checkpoints_folder, 'sparsity_varied_experiment', 'run_{:d}_loss_varied.npz'.format(k))
+        if transductive:
+            file_name = 'run_{:d}_loss_varied_trans.npz'.format(k)
+        else:
+            file_name = 'run_{:d}_loss_varied.npz'.format(k)
+
+        path = os.path.join(checkpoints_folder, 'sparsity_varied_experiment', file_name)
         file = open(path, 'wb')
         np.savez(file, loss_ts=loss_ts[k,:,:], loss_mean=loss_mean[k,:,:])
         file.close()
 
-        file_ts = open(checkpoints_folder + '/sparsity_varied_experiment/run_{:d}_loss_varied_ts.csv'.format(k), 'w')
-        np.savetxt(file_ts, loss_ts[k,:,:])
-        file_ts.close()
-
-        file_mean = open(checkpoints_folder + '/sparsity_varied_experiment/run_{:d}_loss_varied_mean.csv'.format(k), 'w')
-        np.savetxt(file_mean, loss_mean[k, :, :])
-        file_mean.close()
+        # file_ts = open(checkpoints_folder + '/sparsity_varied_experiment/run_{:d}_loss_varied_ts.csv'.format(k), 'w')
+        # np.savetxt(file_ts, loss_ts[k,:,:])
+        # file_ts.close()
+        #
+        # file_mean = open(checkpoints_folder + '/sparsity_varied_experiment/run_{:d}_loss_varied_mean.csv'.format(k), 'w')
+        # np.savetxt(file_mean, loss_mean[k, :, :])
+        # file_mean.close()
 
 
 

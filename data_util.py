@@ -109,7 +109,7 @@ class DataLoader:
 
 class ToyDataLoader:
 
-    def __init__(self, sizes, sparsity, split_sizes, num_features, embedding_size, min_observed, embeddings=None, observed=None, alpha=None, predict_unobserved=False):
+    def __init__(self, sizes, sparsity, split_sizes, num_features, embedding_size, min_observed, embeddings=None, observed=None, alpha=None, predict_unobserved=False, predict=None):
         self.sizes = sizes
         self._n_students = sizes[0]
         self._n_courses = sizes[1]
@@ -120,7 +120,7 @@ class ToyDataLoader:
         self._min_observed = min_observed
         self._observed = observed
         self._predict_unobserved = predict_unobserved
-        # self._unobserved = unobserved
+        self._predict = predict
 
         if alpha is None:
             self._alpha = {'sc':None, 'sp':None, 'cp':None}
@@ -154,18 +154,18 @@ class ToyDataLoader:
         embeds_p = self.embeddings['prof']
 
         if self._observed is None:
-            table_sc = self._make_table(embeds_s, embeds_c, tid=0, observed=None)
-            table_sp = self._make_table(embeds_s, embeds_p, tid=1, observed=None)
-            table_cp = self._make_table(embeds_c, embeds_p, tid=2, observed=None)
+            table_sc = self._make_table(embeds_s, embeds_c, tid=0)
+            table_sp = self._make_table(embeds_s, embeds_p, tid=1)
+            table_cp = self._make_table(embeds_c, embeds_p, tid=2)
         else:
-            table_sc = self._make_table(embeds_s, embeds_c, tid=0, observed=self._observed['sc'], alpha=self._alpha['sc'])
-            table_sp = self._make_table(embeds_s, embeds_p, tid=1, observed=self._observed['sp'], alpha=self._alpha['sp'])
-            table_cp = self._make_table(embeds_c, embeds_p, tid=2, observed=self._observed['cp'], alpha=self._alpha['cp'])
+            table_sc = self._make_table(embeds_s, embeds_c, tid=0, observed=self._observed['sc'], predict=self._predict['sc'], alpha=self._alpha['sc'])
+            table_sp = self._make_table(embeds_s, embeds_p, tid=1, observed=self._observed['sp'], predict=self._predict['sp'], alpha=self._alpha['sp'])
+            table_cp = self._make_table(embeds_c, embeds_p, tid=2, observed=self._observed['cp'], predict=self._predict['cp'], alpha=self._alpha['cp'])
 
         return {'student_course': table_sc, 'student_prof':table_sp, 'course_prof':table_cp}
 
 
-    def _make_table(self, row_embeds, col_embeds, tid, observed=None, unobserved=None, alpha=None):
+    def _make_table(self, row_embeds, col_embeds, tid, observed=None, predict=None, alpha=None):
 
         assert row_embeds.shape[1] == col_embeds.shape[1]
 
@@ -188,13 +188,22 @@ class ToyDataLoader:
             raise Exception('invalid embedding size')
 
         if observed is None:
-            assert unobserved is None, "Observed is None, but unobserved is not None..."
             observed = choose_observed(tid, shape, self._sparsity, min_observed=self._min_observed)
 
         if self._predict_unobserved:
             inds = np.array(np.nonzero(np.ones((n_rows, n_cols)))).T
             vals = tab.flatten()
             split = 1. - observed.flatten()
+
+        elif predict is not None:
+            in_vals = observed + predict
+            inds = np.array(np.nonzero(in_vals)).T
+            vals = tab.flatten()[in_vals.flatten() > 0]
+            # in_vals = in_vals[in_vals != 0]
+            split = np.zeros_like(in_vals.flatten())
+            split[predict.flatten() == 1] = 1
+            split = split[in_vals.flatten() != 0]
+
         # elif unobserved is not None:
         #
         #     inds = np.array(np.nonzero(observed + unobserved)).T
