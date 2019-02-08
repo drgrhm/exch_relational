@@ -9,16 +9,15 @@ if __name__ == "__main__":
     np.set_printoptions(suppress=True, linewidth=np.nan, threshold=np.nan)
 
     # experiment = 'embedding'
-    # experiment = 'sparsity'
+    experiment = 'sparsity'
     # experiment = 'side_info'
-    experiment = 'sparsity_varied'
+    # experiment = 'sparsity_varied'
 
     ## Embeddings experiment
     if experiment == 'embedding':
 
-        # np.random.seed(9873866)
-        # seeds = np.random.randint(low=0, high=1000000, size=1)
-        seeds = [386327]
+        np.random.seed(9988777)
+        seeds = np.random.randint(low=0, high=1000000, size=1)
         for seed in seeds:
 
             image_path = 'img/embedding_experiment/' + str(seed) + '/'
@@ -152,7 +151,7 @@ if __name__ == "__main__":
 
         # percent_observed = [.9, .8, .7, .6, .5, .4, .3, .2, .1, .0]
         # percent_observed = [.5, .1, .0]
-        percent_observed = [.5, .1, .0]
+        percent_observed = [.5, .3, .1, .0]
 
         num_runs = 2
         loss_ts = np.zeros((num_runs, len(percent_observed)))
@@ -167,13 +166,13 @@ if __name__ == "__main__":
 
         colours_ts = ['#FF5733', '#33FFFF', '#7DFF33', '#3383FF', '#FC33FF']
         colours_mn = ['#FFBFB1', '#BDFFFF', '#C8FFA9', '#98BFFC', '#FBACFC']
-        # for k in range(num_runs):
-        #
-        #     plt.plot(percent_observed, loss_ts[k, :], '.-', color=colours_ts[k])
-        #     plt.plot(percent_observed, loss_mean[k, :], '.-', color=colours_mn[k], alpha=.3)
+        for k in range(num_runs):
 
-        plt.plot(percent_observed, np.mean(loss_ts, axis=0), '.-', color='blue')
-        plt.plot(percent_observed, np.mean(loss_mean, axis=0), '.-', color='red')
+            plt.plot(percent_observed, loss_ts[k, :], '.-', color=colours_ts[k])
+            plt.plot(percent_observed, loss_mean[k, :], '.-', color=colours_mn[k], alpha=.3)
+
+        # plt.plot(percent_observed, np.mean(loss_ts, axis=0), '.-', color='blue')
+        # plt.plot(percent_observed, np.mean(loss_mean, axis=0), '.-', color='red')
 
 
         # loss_mn = np.mean(loss_mean, axis=0)

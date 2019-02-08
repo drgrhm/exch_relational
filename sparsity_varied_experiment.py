@@ -1,13 +1,15 @@
 import os
 import numpy as np
 from main import main
-from layers import ExchangeableLayer, FeatureDropoutLayer, PoolingLayer
+from layers import ExchangeableLayer, FeatureDropoutLayer, PoolingLayer, BatchNormLayer
 from data_util import ToyDataLoader
 from util import gaussian_embeddings, np_rmse_loss, update_observed
 import tensorflow as tf
 
 
 if __name__ == "__main__":
+
+    np.set_printoptions(suppress=True,linewidth=np.nan,threshold=np.nan)
 
     data_set = 'toy'
     units_in = 1
@@ -18,13 +20,13 @@ if __name__ == "__main__":
 
     # activation = tf.nn.relu
     activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
-    dropout_rate = 0.02
-    skip_connections = True
+    dropout_rate = 0.2
+    skip_connections = False
 
     auto_restore = False
     # save_model = False
 
-    opts = {'epochs':50000,
+    opts = {'epochs':5000,
                 'data_folder':'data',
                 'data_set':data_set,
                 # 'split_sizes':[.8, .2, .0], # train, validation, test split
@@ -36,31 +38,33 @@ if __name__ == "__main__":
                 'toy_data':{'size':[200, 200, 200],
                             # 'sparsity':1.,
                             'embedding_size':embedding_size_data,
-                            'min_observed':1, # generate at least 2 entries per row and column (sparsity rate will be affected)
+                            'min_observed':5, # generate at least 2 entries per row and column (sparsity rate will be affected)
                 },
                 'encoder_opts':{'pool_mode':'mean',
                               'dropout_rate':dropout_rate,
                               'units_in':units_in,
                               'units_out':units_out,
                               'layers':[
-                                        {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
-                                        {'type':FeatureDropoutLayer, 'units_out':units},
-                                        {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                        {'type':FeatureDropoutLayer, 'units_out':units},
-                                        {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                        {'type':FeatureDropoutLayer, 'units_out':units},
-                                        {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                        {'type':FeatureDropoutLayer, 'units_out':units},
-                                        {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                        {'type':FeatureDropoutLayer, 'units_out':units},
-                                        {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                        {'type':FeatureDropoutLayer, 'units_out':units},
-                                        # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                        # {'type':FeatureDropoutLayer, 'units_out':units},
-                                        # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                        # {'type':FeatureDropoutLayer, 'units_out':units},
-                                        {'type':ExchangeableLayer, 'units_out':embedding_size_network,  'activation':None},
-                                        {'type':PoolingLayer, 'units_out':embedding_size_network},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'save_embeddings':True},
+                                  {'type':BatchNormLayer, 'units_out':units},
+                                  {'type':FeatureDropoutLayer, 'units_out':units},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                  {'type':BatchNormLayer, 'units_out':units},
+                                  {'type':FeatureDropoutLayer, 'units_out':units},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                  {'type':BatchNormLayer, 'units_out':units},
+                                  {'type':FeatureDropoutLayer, 'units_out':units},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                  {'type':BatchNormLayer, 'units_out':units},
+                                  {'type':FeatureDropoutLayer, 'units_out':units},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                  {'type':BatchNormLayer, 'units_out':units},
+                                  {'type':FeatureDropoutLayer, 'units_out':units},
+                                  {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                  {'type':BatchNormLayer, 'units_out':units},
+                                  {'type':FeatureDropoutLayer, 'units_out':units},
+                                  {'type':ExchangeableLayer, 'units_out':embedding_size_network, 'activation':None},
+                                  {'type':PoolingLayer, 'units_out':embedding_size_network},
                                        ],
                                 },
                 'decoder_opts': {'pool_mode':'mean',
@@ -69,21 +73,23 @@ if __name__ == "__main__":
                                  'units_out':units_out,
                                   'layers': [
                                       {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
+                                      {'type':BatchNormLayer, 'units_out':units},
                                       {'type':FeatureDropoutLayer, 'units_out':units},
                                       {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                      {'type':BatchNormLayer, 'units_out':units},
                                       {'type':FeatureDropoutLayer, 'units_out':units},
                                       {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                      {'type':BatchNormLayer, 'units_out':units},
                                       {'type':FeatureDropoutLayer, 'units_out':units},
                                       {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                      {'type':BatchNormLayer, 'units_out':units},
                                       {'type':FeatureDropoutLayer, 'units_out':units},
-                                      {'type':ExchangeableLayer, 'units_out':units, 'activation': activation, 'skip_connections':skip_connections},
-                                      {'type':FeatureDropoutLayer, 'units_out': units},
                                       {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                      {'type':BatchNormLayer, 'units_out':units},
                                       {'type':FeatureDropoutLayer, 'units_out':units},
-                                      # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                      # {'type':FeatureDropoutLayer, 'units_out':units},
-                                      # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                      # {'type':FeatureDropoutLayer, 'units_out':units},
+                                      {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                      {'type':BatchNormLayer, 'units_out':units},
+                                      {'type':FeatureDropoutLayer, 'units_out':units},
                                       {'type':ExchangeableLayer, 'units_out':units_out, 'activation':None},
                               ],
                              },
@@ -101,37 +107,14 @@ if __name__ == "__main__":
 
     np.random.seed(1122333)
 
-    # percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1]  # Must be decreasing
-    #
-    # observed_new = [{}]
-    # observed_new[0]['sc'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][1]))
-    # observed_new[0]['sp'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][2]))
-    # observed_new[0]['cp'] = np.ones((opts['toy_data']['size'][1], opts['toy_data']['size'][2]))
-    # for i in range(1, len(percent_observed)):  # data matrices are percent_observed[i]% observed
-    #
-    #     p_prev = percent_observed[i - 1]
-    #     p = percent_observed[i]
-    #
-    #     p_keep = p / p_prev
-    #
-    #     # observed_new.append({})
-    #     observed_new[i]['sc'] = update_observed(observed_new[i - 1]['sc'], p_keep, opts['toy_data']['min_observed'])
-    #     observed_new[i]['sp'] = update_observed(observed_new[i - 1]['sp'], p_keep, opts['toy_data']['min_observed'])
-    #     observed_new[i]['cp'] = update_observed(observed_new[i - 1]['cp'], p_keep, opts['toy_data']['min_observed'])
-    #
-    # percent_observed = percent_observed[1:]  # remove 1.0 from list, since some data must be unobserved to make predictions
-    # observed_new = observed_new[1:]  # remove corresponding matrix
-
-
     checkpoints_folder = opts['checkpoints_folder']
 
-    n_runs = 5
+    n_runs = 3
     loss_ts = np.zeros((n_runs, 9, 9))
     loss_mean = np.zeros((n_runs, 9, 9))
 
-
     #########
-    transductive = False
+    transductive = True
 
     if transductive:
         np.random.seed(9873866)
@@ -140,9 +123,8 @@ if __name__ == "__main__":
         np.random.seed(9858776)
 
     # observed_new = []
-    # for k in range(n_runs):
-    for k in [1]:
-
+    for k in range(n_runs): # repeat experiment n_runs times and average
+    # for k in [1]:
         print('######################## Run ', k, '########################')
 
         if transductive:
@@ -155,13 +137,11 @@ if __name__ == "__main__":
         embeddings['course'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
         embeddings['prof'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
 
-        num_alpha = max(4, opts['toy_data']['embedding_size'])
-        alpha = {'sc':2 * np.random.randn(num_alpha), 'sp':2 * np.random.randn(num_alpha), 'cp':2 * np.random.randn(num_alpha)}
-
         observed = [{}]
         observed[0]['sc'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][1]))
         observed[0]['sp'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][2]))
         observed[0]['cp'] = np.ones((opts['toy_data']['size'][1], opts['toy_data']['size'][2]))
+
         for i in range(1, len(percent_observed)): # data matrices are percent_observed[i]% observed
 
             p_prev = percent_observed[i-1]
@@ -177,12 +157,9 @@ if __name__ == "__main__":
         percent_observed = percent_observed[1:] # remove 1.0 from list, since some data must be unobserved to make predictions
         observed = observed[1:] # remove corresponding matrix
 
-        # observed_new.append({})
-
         for i, p in enumerate(percent_observed): # training sparsity level
 
                 print('========== Observed loop ', i, '==========')
-
 
                 count_sc = observed[i]['sc'].shape[0] * observed[i]['sc'].shape[1]
                 count_sp = observed[i]['sp'].shape[0] * observed[i]['sp'].shape[1]
@@ -228,8 +205,6 @@ if __name__ == "__main__":
                                                      opts['toy_data']['embedding_size'],
                                                      opts['toy_data']['min_observed'],
                                                      embeddings=embeddings,
-                                                     # alpha=alpha,
-                                                     alpha=None,
                                                      observed=observed_new,
                                                      predict_unobserved=False,
                                                      predict=predict)
@@ -238,7 +213,7 @@ if __name__ == "__main__":
                         opts['evaluate_only'] = True
                         opts['save_model'] = False
 
-                        loss_ts[k, i, j], loss_mean[k, i, j] = main(opts, restore_point)
+                        loss_ts[k, i, j], loss_mean[k, i, j], _, _, _ = main(opts, restore_point)
 
         print(loss_ts[k,:,:])
         print(loss_mean[k, :, :])

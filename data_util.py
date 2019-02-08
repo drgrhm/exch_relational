@@ -109,7 +109,7 @@ class DataLoader:
 
 class ToyDataLoader:
 
-    def __init__(self, sizes, sparsity, split_sizes, num_features, embedding_size, min_observed, embeddings=None, observed=None, alpha=None, predict_unobserved=False, predict=None):
+    def __init__(self, sizes, sparsity, split_sizes, num_features, embedding_size, min_observed, embeddings=None, observed=None, predict_unobserved=False, predict=None):
         self.sizes = sizes
         self._n_students = sizes[0]
         self._n_courses = sizes[1]
@@ -118,14 +118,16 @@ class ToyDataLoader:
         self._num_features = num_features
         self._embedding_size = embedding_size
         self._min_observed = min_observed
-        self._observed = observed
-        self._predict_unobserved = predict_unobserved
-        self._predict = predict
-
-        if alpha is None:
-            self._alpha = {'sc':None, 'sp':None, 'cp':None}
+        if observed is not None:
+            self._observed = observed
         else:
-            self._alpha = alpha
+            self._observed = {'sc':None, 'sp':None, 'cp':None}
+        if predict is not None:
+            self._predict = predict
+        else:
+            self._predict = {'sc':None, 'sp':None, 'cp':None}
+        self._predict_unobserved = predict_unobserved
+
 
         assert embedding_size == 2, 'Currently only embedding size of 2 is supported'
 
@@ -153,19 +155,19 @@ class ToyDataLoader:
         embeds_c = self.embeddings['course']
         embeds_p = self.embeddings['prof']
 
-        if self._observed is None:
-            table_sc = self._make_table(embeds_s, embeds_c, tid=0)
-            table_sp = self._make_table(embeds_s, embeds_p, tid=1)
-            table_cp = self._make_table(embeds_c, embeds_p, tid=2)
-        else:
-            table_sc = self._make_table(embeds_s, embeds_c, tid=0, observed=self._observed['sc'], predict=self._predict['sc'], alpha=self._alpha['sc'])
-            table_sp = self._make_table(embeds_s, embeds_p, tid=1, observed=self._observed['sp'], predict=self._predict['sp'], alpha=self._alpha['sp'])
-            table_cp = self._make_table(embeds_c, embeds_p, tid=2, observed=self._observed['cp'], predict=self._predict['cp'], alpha=self._alpha['cp'])
+        # if self._observed is None:
+        #     table_sc = self._make_table(embeds_s, embeds_c, tid=0)
+        #     table_sp = self._make_table(embeds_s, embeds_p, tid=1)
+        #     table_cp = self._make_table(embeds_c, embeds_p, tid=2)
+        # else:
+        table_sc = self._make_table(embeds_s, embeds_c, tid=0, observed=self._observed['sc'], predict=self._predict['sc'])
+        table_sp = self._make_table(embeds_s, embeds_p, tid=1, observed=self._observed['sp'], predict=self._predict['sp'])
+        table_cp = self._make_table(embeds_c, embeds_p, tid=2, observed=self._observed['cp'], predict=self._predict['cp'])
 
         return {'student_course': table_sc, 'student_prof':table_sp, 'course_prof':table_cp}
 
 
-    def _make_table(self, row_embeds, col_embeds, tid, observed=None, predict=None, alpha=None):
+    def _make_table(self, row_embeds, col_embeds, tid, observed=None, predict=None):
 
         assert row_embeds.shape[1] == col_embeds.shape[1]
 
@@ -174,10 +176,6 @@ class ToyDataLoader:
         embeds_size = row_embeds.shape[1]
         shape = (n_rows, n_cols)
         tab = np.zeros((n_rows, n_cols))
-
-        if alpha is None:
-            alpha = 3 * np.random.randn(2 * embeds_size)
-        alpha = np.reshape(alpha, (embeds_size, embeds_size))
 
         if self._embedding_size == 2:
             for i in range(n_rows):
@@ -204,16 +202,6 @@ class ToyDataLoader:
             split[predict.flatten() == 1] = 1
             split = split[in_vals.flatten() != 0]
 
-        # elif unobserved is not None:
-        #
-        #     inds = np.array(np.nonzero(observed + unobserved)).T
-        #     vals = tab.flatten()[observed.flatten() == 1]
-        #     # n = inds.shape[0]
-        #     # n_tr = int(n * self._split_sizes[0])
-        #
-        #     # split = np.concatenate((np.zeros(n_tr), np.ones(n - n_tr), 2*np.ones))
-        #
-        #     split = np.concatenate((np.zeros_like(observed.flatten()), np.ones_like(unobserved.flatten())))
         else:
             inds = np.array(np.nonzero(observed)).T
             vals = tab.flatten()[observed.flatten() == 1]

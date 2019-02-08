@@ -38,11 +38,11 @@ def main(opts, restore_point=None):
             mean_sc = np.mean(data.tables['student_course'].values_tr)
             split_sc = data.tables['student_course'].split
             loss_mean += np_rmse_loss(data.tables['student_course'].values_tr_vl, mean_sc * np.ones_like(data.tables['student_course'].values_tr_vl), 1. * (split_sc == 1))  # Loss on validation set when predicting training mean
-        if opts['calculate_loss'][1]:
+        if opts['calculate_loss'][1] and opts['decoder_opts']['side_info']:
             mean_sp = np.mean(data.tables['student_prof'].values_tr)
             split_sp = data.tables['student_prof'].split
             loss_mean += np_rmse_loss(data.tables['student_prof'].values_tr_vl, mean_sp * np.ones_like(data.tables['student_prof'].values_tr_vl), 1. * (split_sp == 1))  # Loss on validation set when predicting training mean
-        if opts['calculate_loss'][2]:
+        if opts['calculate_loss'][2] and opts['decoder_opts']['side_info']:
             mean_cp = np.mean(data.tables['course_prof'].values_tr)
             split_cp = data.tables['course_prof'].split
             loss_mean += np_rmse_loss(data.tables['course_prof'].values_tr_vl, mean_cp * np.ones_like(data.tables['course_prof'].values_tr_vl), 1. * (split_cp == 1))  # Loss on validation set when predicting training mean
@@ -51,11 +51,11 @@ def main(opts, restore_point=None):
             mean_sc = np.mean(data.tables['student_course'].values_tr_vl)
             split_sc = data.tables['student_course'].split
             loss_mean += np_rmse_loss(data.tables['student_course'].values_all, mean_sc * np.ones_like(data.tables['student_course'].values_all), 1. * (split_sc == 2))  # Loss on test set when predicting training/validation mean
-        if opts['calculate_loss'][1]:
+        if opts['calculate_loss'][1] and opts['decoder_opts']['side_info']:
             mean_sp = np.mean(data.tables['student_prof'].values_tr_vl)
             split_sp = data.tables['student_prof'].split
             loss_mean += np_rmse_loss(data.tables['student_prof'].values_all, mean_sp * np.ones_like(data.tables['student_prof'].values_all), 1. * (split_sp == 2))  # Loss on test set when predicting training/validation mean
-        if opts['calculate_loss'][2]:
+        if opts['calculate_loss'][2] and opts['decoder_opts']['side_info']:
             mean_cp = np.mean(data.tables['course_prof'].values_tr_vl)
             split_cp = data.tables['course_prof'].split
             loss_mean += np_rmse_loss(data.tables['course_prof'].values_all, mean_cp * np.ones_like(data.tables['course_prof'].values_all), 1. * (split_cp == 2))  # Loss on test set when predicting training/validation mean
@@ -179,10 +179,10 @@ def main(opts, restore_point=None):
         if student_course['calculate_loss']:
             rec_loss_tr += rmse_loss(student_course['values'], decoder_out_tr['student_course']['values'], student_course['noise_mask'])
             rec_loss_vl += rmse_loss(student_course['values'], decoder_out_vl['student_course']['values'], student_course['noise_mask'])
-        if student_prof['calculate_loss']:
+        if student_prof['calculate_loss'] and opts['decoder_opts']['side_info']:
             rec_loss_tr += rmse_loss(student_prof['values'], decoder_out_tr['student_prof']['values'], student_prof['noise_mask'])
             rec_loss_vl += rmse_loss(student_prof['values'], decoder_out_vl['student_prof']['values'], student_prof['noise_mask'])
-        if course_prof['calculate_loss']:
+        if course_prof['calculate_loss'] and opts['decoder_opts']['side_info']:
             rec_loss_tr += rmse_loss(course_prof['values'], decoder_out_tr['course_prof']['values'], course_prof['noise_mask'])
             rec_loss_vl += rmse_loss(course_prof['values'], decoder_out_vl['course_prof']['values'], course_prof['noise_mask'])
 
@@ -234,13 +234,13 @@ def main(opts, restore_point=None):
                 split_eval_sc = np.zeros_like(data.tables['student_course'].split == 1)
             vals_eval_sc = data.tables['student_course'].values_all * (split_eval_sc == 0)
 
-            if student_prof['calculate_loss']:
+            if student_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
                 split_eval_sp = 1. * (data.tables['student_prof'].split == 1)
             else:
                 split_eval_sp = np.zeros_like(data.tables['student_prof'].split == 1)
             vals_eval_sp = data.tables['student_prof'].values_all * (split_eval_sp == 0)
 
-            if course_prof['calculate_loss']:
+            if course_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
                 split_eval_cp = 1. * (data.tables['course_prof'].split == 1)
             else:
                 split_eval_cp = np.zeros_like(data.tables['course_prof'].split == 1)
@@ -267,22 +267,24 @@ def main(opts, restore_point=None):
                                                                                                          student_embeds_vl,
                                                                                                          course_embeds_vl,
                                                                                                          prof_embeds_vl], feed_dict=eval_dict)
-            return loss_eval, loss_mean
-            # return loss_eval, loss_mean, student_embeds_out_eval, course_embeds_out_eval, prof_embeds_out_eval
+            # return loss_eval, loss_mean
+            return loss_eval, loss_mean, student_embeds_out_eval, course_embeds_out_eval, prof_embeds_out_eval
 
+
+        ## Save initial (untrained) embeddings
         if student_course['calculate_loss']:
             split_vl_sc = data.tables['student_course'].split[data.tables['student_course'].split <= 1]
         else:
             split_vl_sc = np.zeros_like(data.tables['student_course'].split[data.tables['student_course'].split <= 1])
         vals_vl_sc = data.tables['student_course'].values_tr_vl * (split_vl_sc == 0)
 
-        if student_prof['calculate_loss']:
+        if student_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
             split_vl_sp = data.tables['student_prof'].split[data.tables['student_prof'].split <= 1]
         else:
             split_vl_sp = np.zeros_like(data.tables['student_prof'].split[data.tables['student_prof'].split <= 1])
         vals_vl_sp = data.tables['student_prof'].values_tr_vl * (split_vl_sp == 0)
 
-        if course_prof['calculate_loss']:
+        if course_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
             split_vl_cp = data.tables['course_prof'].split[data.tables['course_prof'].split <= 1]
         else:
             split_vl_cp = np.zeros_like(data.tables['course_prof'].split[data.tables['course_prof'].split <= 1])
@@ -315,51 +317,22 @@ def main(opts, restore_point=None):
                 print('------- epoch:', ep, '-------')
 
             ## Training
-            n_tr_sc = data.tables['student_course'].values_tr.shape[0]
-            if student_course['calculate_loss']:
-                n_compute_sc = int(n_tr_sc * (opts['split_sizes'][0]))
-                n_predict_sc = n_tr_sc - n_compute_sc
-            else:
-                n_compute_sc = n_tr_sc
-                n_predict_sc = 0
-            split_tr_sc = np.concatenate((np.zeros(n_compute_sc, np.int32), np.ones(n_predict_sc, np.int32)))
-            np.random.shuffle(split_tr_sc)
-            vals_tr_sc = data.tables['student_course'].values_tr * (split_tr_sc == 0)
-
-            n_tr_sp = data.tables['student_prof'].values_tr.shape[0]
-            if student_prof['calculate_loss']:
-                n_compute_sp = int(n_tr_sp * (opts['split_sizes'][0]))
-                n_predict_sp = n_tr_sp - n_compute_sp
-            else:
-                n_compute_sp = n_tr_sp
-                n_predict_sp = 0
-            split_tr_sp = np.concatenate((np.zeros(n_compute_sp, np.int32), np.ones(n_predict_sp, np.int32)))
-            np.random.shuffle(split_tr_sp)
-            vals_tr_sp = data.tables['student_prof'].values_tr * (split_tr_sp == 0)
-
-            n_tr_cp = data.tables['course_prof'].values_tr.shape[0]
-            if course_prof['calculate_loss']:
-                n_compute_cp = int(n_tr_cp * (opts['split_sizes'][0]))
-                n_predict_cp = n_tr_cp - n_compute_cp
-            else:
-                n_compute_cp = n_tr_cp
-                n_predict_cp = 0
-            split_tr_cp = np.concatenate((np.zeros(n_compute_cp, np.int32), np.ones(n_predict_cp, np.int32)))
-            np.random.shuffle(split_tr_cp)
-            vals_tr_cp = data.tables['course_prof'].values_tr * (split_tr_cp == 0)
+            split_tr_sc = np.ones_like(data.tables['student_course'].values_tr)
+            split_tr_sp = np.ones_like(data.tables['student_prof'].values_tr)
+            split_tr_cp = np.ones_like(data.tables['course_prof'].values_tr)
 
             tr_dict = {student_course['indices']:data.tables['student_course'].indices_tr,
                        student_course['values']:data.tables['student_course'].values_tr, # values used when calculating loss
                        student_course['noise_mask']:split_tr_sc,
-                       student_course['values_noisy']:vals_tr_sc, # values used for making predictions
+                       student_course['values_noisy']:data.tables['student_course'].values_tr, # values used for making predictions
                        student_prof['indices']:data.tables['student_prof'].indices_tr,
                        student_prof['values']:data.tables['student_prof'].values_tr,
                        student_prof['noise_mask']:split_tr_sp,
-                       student_prof['values_noisy']:vals_tr_sp,
+                       student_prof['values_noisy']:data.tables['student_prof'].values_tr,
                        course_prof['indices']:data.tables['course_prof'].indices_tr,
                        course_prof['values']:data.tables['course_prof'].values_tr,
                        course_prof['noise_mask']:split_tr_cp,
-                       course_prof['values_noisy']:vals_tr_cp,  # values used for making predictions
+                       course_prof['values_noisy']:data.tables['course_prof'].values_tr
                        }
 
             _, loss_tr, student_embeds_out_tr, course_embeds_out_tr, prof_embeds_out_tr = sess.run([train_step,
@@ -377,6 +350,7 @@ def main(opts, restore_point=None):
                 course_embeds_out_tr_best = course_embeds_out_tr
                 prof_embeds_out_tr_best = prof_embeds_out_tr
 
+
             ## Validation
             if student_course['calculate_loss']:
                 split_vl_sc = data.tables['student_course'].split[data.tables['student_course'].split <= 1]
@@ -384,13 +358,13 @@ def main(opts, restore_point=None):
                 split_vl_sc = np.zeros_like(data.tables['student_course'].split[data.tables['student_course'].split <= 1])
             vals_vl_sc = data.tables['student_course'].values_tr_vl * (split_vl_sc == 0)
 
-            if student_prof['calculate_loss']:
+            if student_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
                 split_vl_sp = data.tables['student_prof'].split[data.tables['student_prof'].split <= 1]
             else:
                 split_vl_sp = np.zeros_like(data.tables['student_prof'].split[data.tables['student_prof'].split <= 1])
             vals_vl_sp = data.tables['student_prof'].values_tr_vl * (split_vl_sp == 0)
 
-            if course_prof['calculate_loss']:
+            if course_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
                 split_vl_cp = data.tables['course_prof'].split[data.tables['course_prof'].split <= 1]
             else:
                 split_vl_cp = np.zeros_like(data.tables['course_prof'].split[data.tables['course_prof'].split <= 1])
@@ -414,9 +388,6 @@ def main(opts, restore_point=None):
                                                                                          encoder_out_vl['student_course']['row_embeds'],
                                                                                          encoder_out_vl['student_course']['col_embeds'],
                                                                                          encoder_out_vl['student_prof']['col_embeds']], feed_dict=vl_dict)
-                                                                                         # encoder_out_vl['student_course']['row_embeds_init'],
-                                                                                         # encoder_out_vl['student_course']['col_embeds_init'],
-                                                                                         # encoder_out_vl['student_prof']['col_embeds_init']], feed_dict=vl_dict)
             losses_vl.append(loss_vl)
 
             ## Testing
@@ -508,22 +479,6 @@ def main(opts, restore_point=None):
 
             ## save EMBEDDINGS ONLY periodically.
             if ep % opts['save_frequency'] == 0 and opts['save_model']:
-                # model_path = os.path.join(opts['checkpoints_folder'], 'ep_{:05d}.ckpt'.format(ep))
-                # saver.save(sess, model_path)
-                #
-                # loss_path = os.path.join(opts['checkpoints_folder'], 'loss_{:05d}.npz'.format(ep))
-                # loss_file = open(loss_path, 'wb')
-                # np.savez(loss_file,
-                #          losses_tr=losses_tr,
-                #          losses_vl=losses_vl,
-                #          losses_ts=losses_ts,
-                #          loss_tr_best=loss_tr_best,
-                #          loss_vl_best=loss_vl_best,
-                #          loss_ts_vl_best=loss_ts_vl_best,
-                #          loss_mean=loss_mean,
-                #          loss_tr_best_ep=loss_tr_best_ep,
-                #          loss_vl_best_ep=loss_vl_best_ep)
-
                 embeds_path = os.path.join(opts['checkpoints_folder'], 'embeddings_{:05d}.npz'.format(ep))
                 embeds_file = open(embeds_path, 'wb')
                 np.savez(embeds_file,
@@ -548,7 +503,7 @@ def main(opts, restore_point=None):
                 print("\t predict mean:    {:5.5f}".format(loss_mean))
 
         # return loss_vl_best, loss_mean
-        return loss_ts_vl_best, loss_mean
+        return loss_ts_vl_best, loss_mean, _, _, _
 
 
 if __name__ == "__main__":
@@ -561,18 +516,18 @@ if __name__ == "__main__":
     units_in = 1
     embedding_size_data = 2
     embedding_size_network = 2
-    units = 64
+    units = 2
     units_out = 1
 
     # activation = tf.nn.relu
     activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
-    dropout_rate = 0.02
+    dropout_rate = 0.2
     skip_connections = True
 
     auto_restore = False
     save_model = False
 
-    opts = {'epochs':50000,
+    opts = {'epochs':1000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1], # train, validation, test split
@@ -590,6 +545,7 @@ if __name__ == "__main__":
                           'dropout_rate':dropout_rate,
                           'units_in':units_in,
                           'units_out':units_out,
+                          'side_info':True,
                           'layers':[
                                     {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'save_embeddings':True},
                                     {'type':FeatureDropoutLayer, 'units_out':units},
@@ -603,10 +559,6 @@ if __name__ == "__main__":
                                     {'type':FeatureDropoutLayer, 'units_out':units},
                                     {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
                                     {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # # {'type':FeatureDropoutLayer, 'units_out':units},
-                                    # # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                    # # {'type':FeatureDropoutLayer, 'units_out':units},
                                     {'type':ExchangeableLayer, 'units_out':embedding_size_network,  'activation':None},
                                     {'type':PoolingLayer, 'units_out':embedding_size_network},
                                    ],
@@ -615,6 +567,7 @@ if __name__ == "__main__":
                              'dropout_rate':dropout_rate,
                              'units_in':embedding_size_network,
                              'units_out':units_out,
+                             'side_info':True,
                               'layers': [
                                   {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
                                   {'type':FeatureDropoutLayer, 'units_out':units},
@@ -628,10 +581,6 @@ if __name__ == "__main__":
                                   {'type':FeatureDropoutLayer, 'units_out': units},
                                   {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
                                   {'type':FeatureDropoutLayer, 'units_out':units},
-                                  # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                  # {'type':FeatureDropoutLayer, 'units_out':units},
-                                  # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                  # {'type':FeatureDropoutLayer, 'units_out':units},
                                   {'type':ExchangeableLayer, 'units_out':units_out, 'activation':None},
                           ],
                          },

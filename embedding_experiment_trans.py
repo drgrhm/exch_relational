@@ -4,7 +4,7 @@ from main import main
 import tensorflow as tf
 from util import plot_embeddings, gaussian_embeddings
 from data_util import ToyDataLoader
-from layers import ExchangeableLayer, FeatureDropoutLayer, PoolingLayer
+from layers import ExchangeableLayer, FeatureDropoutLayer, PoolingLayer, BatchNormLayer
 
 if __name__ == "__main__":
 
@@ -19,12 +19,12 @@ if __name__ == "__main__":
     # activation = tf.nn.relu
     activation = lambda x: tf.nn.relu(x) - 0.01*tf.nn.relu(-x) # Leaky Relu
     dropout_rate = 0.2
-    skip_connections = True
+    skip_connections = False
 
     auto_restore = False
     save_model = True
 
-    opts = {'epochs':50000,
+    opts = {'epochs':5000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .2, 0],  # train, validation, test split
@@ -44,21 +44,23 @@ if __name__ == "__main__":
                             'units_out':units_out,
                             'layers':[
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'save_embeddings':True},
+                                {'type':BatchNormLayer, 'units_out':units},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                {'type':BatchNormLayer, 'units_out':units},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                {'type':BatchNormLayer, 'units_out':units},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                {'type':BatchNormLayer, 'units_out':units},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                {'type':BatchNormLayer, 'units_out':units},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                {'type':BatchNormLayer, 'units_out':units},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
-                                # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                # {'type':FeatureDropoutLayer, 'units_out':units},
-                                # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                # {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':embedding_size_network, 'activation':None},
                                 {'type':PoolingLayer, 'units_out':embedding_size_network},
                             ],
@@ -69,21 +71,23 @@ if __name__ == "__main__":
                             'units_out':units_out,
                             'layers':[
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation},
+                                {'type':BatchNormLayer, 'units_out':units},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                {'type':BatchNormLayer, 'units_out':units},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                {'type':BatchNormLayer, 'units_out':units},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                {'type':BatchNormLayer, 'units_out':units},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                {'type':BatchNormLayer, 'units_out':units},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
+                                {'type':BatchNormLayer, 'units_out':units},
                                 {'type':FeatureDropoutLayer, 'units_out':units},
-                                # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                # {'type':FeatureDropoutLayer, 'units_out':units},
-                                # {'type':ExchangeableLayer, 'units_out':units, 'activation':activation, 'skip_connections':skip_connections},
-                                # {'type':FeatureDropoutLayer, 'units_out':units},
                                 {'type':ExchangeableLayer, 'units_out':units_out, 'activation':None},
                             ],
                             },
@@ -99,18 +103,14 @@ if __name__ == "__main__":
             # 'seed': 9870112,
             }
 
-    # np.random.seed(9988777)
-    # seeds = np.random.randint(low=0, high=1000000, size=1)
-    # seeds = [199527]
-    seeds = [386327]
-    # os.mkdir('checkpoints/embedding_experiment/')
+    np.random.seed(9988777)
+    seeds = np.random.randint(low=0, high=1000000, size=1)
 
     for seed in seeds:
 
         print('===== Seed ', seed, '=====')
 
         path_cpt = 'checkpoints/embedding_experiment_trans/' + str(seed)
-        # os.mkdir(path_cpt)
 
         image_path = 'img/embedding_experiment_trans/'
 
@@ -148,7 +148,9 @@ if __name__ == "__main__":
         # embeds_c = embeds_data['course_embeds_in']
         # embeds_p = embeds_data['prof_embeds_in']
 
-        plot_embeddings(embeddings['student'], np.squeeze(student_embeds), image_path + 'student_embeddings_inductive.pdf')
-        plot_embeddings(embeddings['course'], np.squeeze(course_embeds), image_path + 'course_embeddings_inductive.pdf')
-        plot_embeddings(embeddings['prof'], np.squeeze(prof_embeds), image_path + 'prof_embeddings_inductive.pdf')
+        os.mkdir(image_path + str(seed))
+
+        plot_embeddings(embeddings['student'], np.squeeze(student_embeds), image_path + str(seed) + '/student_embeddings_inductive.pdf')
+        plot_embeddings(embeddings['course'], np.squeeze(course_embeds), image_path + str(seed) + '/course_embeddings_inductive.pdf')
+        plot_embeddings(embeddings['prof'], np.squeeze(prof_embeds), image_path + str(seed) + '/prof_embeddings_inductive.pdf')
 

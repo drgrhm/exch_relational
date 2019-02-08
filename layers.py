@@ -428,5 +428,40 @@ class PoolingLayer(Layer):
         return tables
 
 
+class BatchNormLayer(Layer):
+
+    def __init__(self, units, **kwargs):
+        Layer.__init__(self, units)
+        # self.pool_mode = kwargs['pool_mode']
+        self.scope = kwargs['scope']
+        # self._side_info = kwargs.get('side_info', True)
+
+    def get_output(self, tables, reuse=None, is_training=True):
+
+        eps = 1e-10
+
+        vals_sc = tf.reshape(tables['student_course']['values'], [-1, self.units_in])
+        mean_sc = tf.reduce_mean(vals_sc, axis=0, keepdims=True)
+        mean_sqr_sc = tf.reduce_mean(vals_sc**2, axis=0, keepdims=True)
+        var_sc = mean_sqr_sc - mean_sc**2
+
+        vals_sp = tf.reshape(tables['student_prof']['values'], [-1, self.units_in])
+        mean_sp = tf.reduce_mean(vals_sp, axis=0, keepdims=True)
+        mean_sqr_sp = tf.reduce_mean(vals_sp ** 2, axis=0, keepdims=True)
+        var_sp = mean_sqr_sp - mean_sp ** 2
+
+        vals_cp = tf.reshape(tables['course_prof']['values'], [-1, self.units_in])
+        mean_cp = tf.reduce_mean(vals_cp, axis=0, keepdims=True)
+        mean_sqr_cp = tf.reduce_mean(vals_cp ** 2, axis=0, keepdims=True)
+        var_cp = mean_sqr_cp - mean_cp ** 2
+
+        tables['student_course']['values'] = tf.reshape((vals_sc - mean_sc) / tf.sqrt(var_sc + eps), [-1])
+        tables['student_prof']['values'] = tf.reshape((vals_sp - mean_sp) / tf.sqrt(var_sp + eps), [-1])
+        tables['course_prof']['values'] = tf.reshape((vals_cp - mean_cp) / tf.sqrt(var_cp + eps), [-1])
+
+
+        return tables
+
+
 
 
