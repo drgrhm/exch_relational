@@ -24,7 +24,7 @@ if __name__ == "__main__":
     auto_restore = False
     # save_model = False
 
-    opts = {'epochs':10000,
+    opts = {'epochs':5000,
                 'data_folder':'data',
                 'data_set':data_set,
                 # 'split_sizes':[.8, .2, .0], # train, validation, test split
@@ -99,23 +99,25 @@ if __name__ == "__main__":
                 'restore_point_epoch':-1,
                 # 'save_model':save_model,
                 'save_frequency':1000000, # Save model every save_frequency epochs
-                'loss_save_improvement':.005, # If loss changes by more than loss_save_tolerance (as % of old value), save the model
+                'loss_save_improvement':.02, # If loss changes by more than loss_save_tolerance (as % of old value), save the model
                 'debug':True, # Set random seeds or not
                 # 'seed':9858776,
                 'seed': 9870112,
                 }
 
     np.random.seed(9873866)
+    # np.random.seed(9999999)
 
     checkpoints_folder = opts['checkpoints_folder']
     os.mkdir(checkpoints_folder + '/sparsity_experiment')
 
-    n_runs = 5
+    n_runs = 10
     for k in range(n_runs):
 
         print('######################## Run ', k, '########################')
 
-        percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1] # Must be decreasing
+        percent_observed = np.logspace(0, -1.6, num=11, endpoint=True) # log_10(-1.6) corresponds to 2.5% sparsity level, which ensures at least 3 entries per row and column. Include 1. just for constructing observed masks
+        # percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1] # Must be decreasing, include 1. just for constructing observed masks
 
         embeddings = {}
         embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
@@ -150,7 +152,7 @@ if __name__ == "__main__":
         os.mkdir(checkpoints_folder + '/sparsity_experiment/' + str(k))
 
         for i, p in enumerate(percent_observed):
-            print('===== Model building loop ', i, '=====')
+            print("===== Model building loop {:d} ({:4f} fraction) =====".format(i,p))
 
             opts['auto_restore'] = False
             opts['evaluate_only'] = False
@@ -175,32 +177,32 @@ if __name__ == "__main__":
 
             main(opts)
 
-        for i, p in enumerate(percent_observed):
-            print('===== Prediction loop ', i, '=====')
-
-            opts['toy_data']['sparsity'] = p
-            opts['split_sizes'] = None
-            opts['checkpoints_folder'] = checkpoints_folder + '/sparsity_experiment/' + str(k) + '/' + str(i)
-            opts['data'] = ToyDataLoader(opts['toy_data']['size'],
-                                         opts['toy_data']['sparsity'],
-                                         opts['split_sizes'],
-                                         opts['encoder_opts']['units_in'],
-                                         opts['toy_data']['embedding_size'],
-                                         opts['toy_data']['min_observed'],
-                                         embeddings=embeddings,
-                                         observed=observed[i],
-                                         predict_unobserved=True)
-
-            opts['auto_restore'] = True
-            restore_point = opts['checkpoints_folder'] + '/best.ckpt'
-            opts['evaluate_only'] = True
-
-            loss_ts[i], _, _, _, _ = main(opts, restore_point)
-
-        path = os.path.join(checkpoints_folder, 'sparsity_experiment', str(k), 'loss.npz')
-        file = open(path, 'wb')
-        np.savez(file, loss_ts=loss_ts, loss_mean=loss_mean)
-        file.close()
+        # for i, p in enumerate(percent_observed):
+        #     print('===== Prediction loop ', i, '=====')
+        #
+        #     opts['toy_data']['sparsity'] = p
+        #     opts['split_sizes'] = None
+        #     opts['checkpoints_folder'] = checkpoints_folder + '/sparsity_experiment/' + str(k) + '/' + str(i)
+        #     opts['data'] = ToyDataLoader(opts['toy_data']['size'],
+        #                                  opts['toy_data']['sparsity'],
+        #                                  opts['split_sizes'],
+        #                                  opts['encoder_opts']['units_in'],
+        #                                  opts['toy_data']['embedding_size'],
+        #                                  opts['toy_data']['min_observed'],
+        #                                  embeddings=embeddings,
+        #                                  observed=observed[i],
+        #                                  predict_unobserved=True)
+        #
+        #     opts['auto_restore'] = True
+        #     restore_point = opts['checkpoints_folder'] + '/best.ckpt'
+        #     opts['evaluate_only'] = True
+        #
+        #     loss_ts[i], _, _, _, _ = main(opts, restore_point)
+        #
+        # path = os.path.join(checkpoints_folder, 'sparsity_experiment', str(k), 'loss.npz')
+        # file = open(path, 'wb')
+        # np.savez(file, loss_ts=loss_ts, loss_mean=loss_mean)
+        # file.close()
 
 
 

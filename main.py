@@ -70,27 +70,30 @@ def main(opts, restore_point=None):
         ## Container for student_course data
         student_course = {}
         student_course['indices'] = tf.placeholder(tf.int32, shape=(None, 2), name='student_course_indices')
+        student_course['indices_noisy'] = tf.placeholder(tf.int32, shape=(None, 2), name='student_course_indices_noisy')
         student_course['values'] = tf.placeholder(tf.float32, shape=(None), name='student_course_values')
-        student_course['noise_mask'] = tf.placeholder(tf.float32, shape=(None), name='student_course_noise_mask')
         student_course['values_noisy'] = tf.placeholder(tf.float32, shape=(None), name='student_course_values_noisy')
+        student_course['noise_mask'] = tf.placeholder(tf.float32, shape=(None), name='student_course_noise_mask')
         student_course['shape'] = data.tables['student_course'].shape
         student_course['calculate_loss'] = opts['calculate_loss'][0]
 
         ## Container for student_prof data
         student_prof = {}
         student_prof['indices'] = tf.placeholder(tf.int32, shape=(None, 2), name='student_prof_indices')
+        student_prof['indices_noisy'] = tf.placeholder(tf.int32, shape=(None, 2), name='student_prof_indices_noisy')
         student_prof['values'] = tf.placeholder(tf.float32, shape=(None), name='student_prof_values')
-        student_prof['noise_mask'] = tf.placeholder(tf.float32, shape=(None), name='student_prof_noise_mask') # Not needed if no loss calculated in this table
         student_prof['values_noisy'] = tf.placeholder(tf.float32, shape=(None), name='student_prof_values_noisy')
+        student_prof['noise_mask'] = tf.placeholder(tf.float32, shape=(None), name='student_prof_noise_mask') # Not needed if no loss calculated in this table
         student_prof['shape'] = data.tables['student_prof'].shape
         student_prof['calculate_loss'] = opts['calculate_loss'][1]
 
         ## Container for course_prof data
         course_prof = {}
         course_prof['indices'] = tf.placeholder(tf.int32, shape=(None, 2), name='course_prof_indices')
+        course_prof['indices_noisy'] = tf.placeholder(tf.int32, shape=(None, 2), name='course_prof_indices_noisy')
         course_prof['values'] = tf.placeholder(tf.float32, shape=(None), name='course_prof_values')
-        course_prof['noise_mask'] = tf.placeholder(tf.float32, shape=(None), name='course_prof_noise_mask') # Not needed if no loss calculated in this table
         course_prof['values_noisy'] = tf.placeholder(tf.float32, shape=(None), name='course_prof_values_noisy')
+        course_prof['noise_mask'] = tf.placeholder(tf.float32, shape=(None), name='course_prof_noise_mask') # Not needed if no loss calculated in this table
         course_prof['shape'] = data.tables['course_prof'].shape
         course_prof['calculate_loss'] = opts['calculate_loss'][2]
 
@@ -98,20 +101,20 @@ def main(opts, restore_point=None):
         ## Encoder
         encoder_tables= {}
         encoder_tables['student_course'] = {}
-        encoder_tables['student_course']['indices'] = student_course['indices']
+        encoder_tables['student_course']['indices'] = student_course['indices_noisy']
         encoder_tables['student_course']['values'] = student_course['values_noisy']
         encoder_tables['student_course']['noise_mask'] = student_course['noise_mask']
         encoder_tables['student_course']['shape'] = student_course['shape']
 
         encoder_tables['student_prof'] = {}
-        encoder_tables['student_prof']['indices'] = student_prof['indices']
-        encoder_tables['student_prof']['values'] = student_prof['values']
+        encoder_tables['student_prof']['indices'] = student_prof['indices_noisy']
+        encoder_tables['student_prof']['values'] = student_prof['values_noisy']
         encoder_tables['student_prof']['noise_mask'] = student_prof['noise_mask']
         encoder_tables['student_prof']['shape'] = student_prof['shape']
 
         encoder_tables['course_prof'] = {}
-        encoder_tables['course_prof']['indices'] = course_prof['indices']
-        encoder_tables['course_prof']['values'] = course_prof['values']
+        encoder_tables['course_prof']['indices'] = course_prof['indices_noisy']
+        encoder_tables['course_prof']['values'] = course_prof['values_noisy']
         encoder_tables['course_prof']['noise_mask'] = course_prof['noise_mask']
         encoder_tables['course_prof']['shape'] = course_prof['shape']
 
@@ -232,35 +235,38 @@ def main(opts, restore_point=None):
                 split_eval_sc = 1. * (data.tables['student_course'].split == 1)
             else:
                 split_eval_sc = np.zeros_like(data.tables['student_course'].split == 1)
-            vals_eval_sc = data.tables['student_course'].values_all * (split_eval_sc == 0)
+            # vals_eval_sc = data.tables['student_course'].values_all * (split_eval_sc == 0)
 
             if student_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
                 split_eval_sp = 1. * (data.tables['student_prof'].split == 1)
             else:
                 split_eval_sp = np.zeros_like(data.tables['student_prof'].split == 1)
-            vals_eval_sp = data.tables['student_prof'].values_all * (split_eval_sp == 0)
+            # vals_eval_sp = data.tables['student_prof'].values_all * (split_eval_sp == 0)
 
             if course_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
                 split_eval_cp = 1. * (data.tables['course_prof'].split == 1)
             else:
                 split_eval_cp = np.zeros_like(data.tables['course_prof'].split == 1)
-            vals_eval_cp = data.tables['course_prof'].values_all * (split_eval_cp == 0)
+            # vals_eval_cp = data.tables['course_prof'].values_all * (split_eval_cp == 0)
 
 
             eval_dict = {student_course['indices']:data.tables['student_course'].indices_all,
+                         student_course['indices_noisy']:data.tables['student_course'].indices_all,
                          student_course['values']:data.tables['student_course'].values_all,  # values used when calculating loss
+                         student_course['values_noisy']:data.tables['student_course'].values_all,  # values used for making predictions
                          student_course['noise_mask']:split_eval_sc,
-                         student_course['values_noisy']:vals_eval_sc,  # values used for making predictions
 
                          student_prof['indices']:data.tables['student_prof'].indices_all,
+                         student_prof['indices_noisy']:data.tables['student_prof'].indices_all,
                          student_prof['values']:data.tables['student_prof'].values_all,
+                         student_prof['values_noisy']:data.tables['student_prof'].values_all,
                          student_prof['noise_mask']:split_eval_sp,
-                         student_prof['values_noisy']:vals_eval_sp,
 
                          course_prof['indices']:data.tables['course_prof'].indices_all,
+                         course_prof['indices_noisy']:data.tables['course_prof'].indices_all,
                          course_prof['values']:data.tables['course_prof'].values_all,
-                         course_prof['noise_mask']:split_eval_cp,
-                         course_prof['values_noisy']:vals_eval_cp,
+                         course_prof['values_noisy']:data.tables['course_prof'].values_all,
+                         course_prof['noise_mask']:split_eval_cp
                          }
 
             loss_eval, student_embeds_out_eval, course_embeds_out_eval, prof_embeds_out_eval = sess.run([rec_loss_vl,
@@ -276,34 +282,37 @@ def main(opts, restore_point=None):
             split_vl_sc = data.tables['student_course'].split[data.tables['student_course'].split <= 1]
         else:
             split_vl_sc = np.zeros_like(data.tables['student_course'].split[data.tables['student_course'].split <= 1])
-        vals_vl_sc = data.tables['student_course'].values_tr_vl * (split_vl_sc == 0)
+        # vals_vl_sc = data.tables['student_course'].values_tr_vl * (split_vl_sc == 0)
 
         if student_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
             split_vl_sp = data.tables['student_prof'].split[data.tables['student_prof'].split <= 1]
         else:
             split_vl_sp = np.zeros_like(data.tables['student_prof'].split[data.tables['student_prof'].split <= 1])
-        vals_vl_sp = data.tables['student_prof'].values_tr_vl * (split_vl_sp == 0)
+        # vals_vl_sp = data.tables['student_prof'].values_tr_vl * (split_vl_sp == 0)
 
         if course_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
             split_vl_cp = data.tables['course_prof'].split[data.tables['course_prof'].split <= 1]
         else:
             split_vl_cp = np.zeros_like(data.tables['course_prof'].split[data.tables['course_prof'].split <= 1])
-        vals_vl_cp = data.tables['course_prof'].values_tr_vl * (split_vl_cp == 0)
+        # vals_vl_cp = data.tables['course_prof'].values_tr_vl * (split_vl_cp == 0)
 
         vl_dict = {student_course['indices']:data.tables['student_course'].indices_tr_vl,
+                   student_course['indices_noisy']:data.tables['student_course'].indices_tr_vl,
                    student_course['values']:data.tables['student_course'].values_tr_vl,  # values used when calculating loss
+                   student_course['values_noisy']:data.tables['student_course'].values_tr_vl,  # values used for making predictions
                    student_course['noise_mask']:split_vl_sc,
-                   student_course['values_noisy']:vals_vl_sc,  # values used for making predictions
 
                    student_prof['indices']:data.tables['student_prof'].indices_tr_vl,
+                   student_prof['indices_noisy']:data.tables['student_prof'].indices_tr_vl,
                    student_prof['values']:data.tables['student_prof'].values_tr_vl,
+                   student_prof['values_noisy']:data.tables['student_prof'].values_tr_vl,
                    student_prof['noise_mask']:split_vl_sp,
-                   student_prof['values_noisy']:vals_vl_sp,
 
                    course_prof['indices']:data.tables['course_prof'].indices_tr_vl,
+                   course_prof['indices_noisy']:data.tables['course_prof'].indices_tr_vl,
                    course_prof['values']:data.tables['course_prof'].values_tr_vl,
+                   course_prof['values_noisy']:data.tables['course_prof'].values_tr_vl,
                    course_prof['noise_mask']:split_vl_cp,
-                   course_prof['values_noisy']:vals_vl_cp,
                    }
 
         student_embeds_init, course_embeds_init, prof_embeds_init, = sess.run([encoder_out_vl['student_course']['row_embeds'],
@@ -322,17 +331,22 @@ def main(opts, restore_point=None):
             split_tr_cp = np.ones_like(data.tables['course_prof'].values_tr)
 
             tr_dict = {student_course['indices']:data.tables['student_course'].indices_tr,
+                       student_course['indices_noisy']:data.tables['student_course'].indices_tr,
                        student_course['values']:data.tables['student_course'].values_tr, # values used when calculating loss
+                       student_course['values_noisy']:data.tables['student_course'].values_tr,  # values used for making predictions
                        student_course['noise_mask']:split_tr_sc,
-                       student_course['values_noisy']:data.tables['student_course'].values_tr, # values used for making predictions
+
                        student_prof['indices']:data.tables['student_prof'].indices_tr,
+                       student_prof['indices_noisy']:data.tables['student_prof'].indices_tr,
                        student_prof['values']:data.tables['student_prof'].values_tr,
-                       student_prof['noise_mask']:split_tr_sp,
                        student_prof['values_noisy']:data.tables['student_prof'].values_tr,
+                       student_prof['noise_mask']:split_tr_sp,
+
                        course_prof['indices']:data.tables['course_prof'].indices_tr,
+                       course_prof['indices_noisy']:data.tables['course_prof'].indices_tr,
                        course_prof['values']:data.tables['course_prof'].values_tr,
+                       course_prof['values_noisy']:data.tables['course_prof'].values_tr,
                        course_prof['noise_mask']:split_tr_cp,
-                       course_prof['values_noisy']:data.tables['course_prof'].values_tr
                        }
 
             _, loss_tr, student_embeds_out_tr, course_embeds_out_tr, prof_embeds_out_tr = sess.run([train_step,
@@ -352,42 +366,44 @@ def main(opts, restore_point=None):
 
 
             ## Validation
-            if student_course['calculate_loss']:
-                split_vl_sc = data.tables['student_course'].split[data.tables['student_course'].split <= 1]
-            else:
-                split_vl_sc = np.zeros_like(data.tables['student_course'].split[data.tables['student_course'].split <= 1])
-            vals_vl_sc = data.tables['student_course'].values_tr_vl * (split_vl_sc == 0)
+            split_vl_sc = data.tables['student_course'].split[data.tables['student_course'].split <= 1]
+            # vals_vl_sc = data.tables['student_course'].values_tr_vl * (split_vl_sc == 0)
 
             if student_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
                 split_vl_sp = data.tables['student_prof'].split[data.tables['student_prof'].split <= 1]
             else:
                 split_vl_sp = np.zeros_like(data.tables['student_prof'].split[data.tables['student_prof'].split <= 1])
-            vals_vl_sp = data.tables['student_prof'].values_tr_vl * (split_vl_sp == 0)
+            # vals_vl_sp = data.tables['student_prof'].values_tr_vl * (split_vl_sp == 0)
 
             if course_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
                 split_vl_cp = data.tables['course_prof'].split[data.tables['course_prof'].split <= 1]
             else:
                 split_vl_cp = np.zeros_like(data.tables['course_prof'].split[data.tables['course_prof'].split <= 1])
-            vals_vl_cp = data.tables['course_prof'].values_tr_vl * (split_vl_cp == 0)
+            # vals_vl_cp = data.tables['course_prof'].values_tr_vl * (split_vl_cp == 0)
 
             vl_dict = {student_course['indices']:data.tables['student_course'].indices_tr_vl,
+                       student_course['indices_noisy']:data.tables['student_course'].indices_tr,
                        student_course['values']:data.tables['student_course'].values_tr_vl, # values used when calculating loss
+                       student_course['values_noisy']:data.tables['student_course'].values_tr,  # values used for making predictions
                        student_course['noise_mask']:split_vl_sc,
-                       student_course['values_noisy']:vals_vl_sc, # values used for making predictions
+
                        student_prof['indices']:data.tables['student_prof'].indices_tr_vl,
+                       student_prof['indices_noisy']:data.tables['student_prof'].indices_tr,
                        student_prof['values']:data.tables['student_prof'].values_tr_vl,
+                       student_prof['values_noisy']:data.tables['student_prof'].values_tr,  # values used for making predictions
                        student_prof['noise_mask']:split_vl_sp,
-                       student_prof['values_noisy']:vals_vl_sp,  # values used for making predictions
+
                        course_prof['indices']:data.tables['course_prof'].indices_tr_vl,
+                       course_prof['indices_noisy']:data.tables['course_prof'].indices_tr,
                        course_prof['values']:data.tables['course_prof'].values_tr_vl,
+                       course_prof['values_noisy']:data.tables['course_prof'].values_tr,
                        course_prof['noise_mask']:split_vl_cp,
-                       course_prof['values_noisy']:vals_vl_cp,
                        }
 
             loss_vl, student_embeds_out_vl, course_embeds_out_vl, prof_embeds_out_vl, = sess.run([rec_loss_vl,
-                                                                                         encoder_out_vl['student_course']['row_embeds'],
-                                                                                         encoder_out_vl['student_course']['col_embeds'],
-                                                                                         encoder_out_vl['student_prof']['col_embeds']], feed_dict=vl_dict)
+                                                                                                  encoder_out_vl['student_course']['row_embeds'],
+                                                                                                  encoder_out_vl['student_course']['col_embeds'],
+                                                                                                  encoder_out_vl['student_prof']['col_embeds']], feed_dict=vl_dict)
             losses_vl.append(loss_vl)
 
             ## Testing
@@ -396,37 +412,42 @@ def main(opts, restore_point=None):
                     split_ts_sc = 1. * (data.tables['student_course'].split == 2)
                 else:
                     split_ts_sc = np.zeros_like(data.tables['student_course'].split == 2)
-                vals_ts_sc = data.tables['student_course'].values_all * (split_ts_sc == 0)
+                # vals_ts_sc = data.tables['student_course'].values_all * (split_ts_sc == 0)
                 if student_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
                     split_ts_sp = 1. * (data.tables['student_prof'].split == 2)
                 else:
                     split_ts_sp = np.zeros_like(data.tables['student_prof'].split == 2)
-                vals_ts_sp = data.tables['student_prof'].values_all * (split_ts_sp == 0)
+                # vals_ts_sp = data.tables['student_prof'].values_all * (split_ts_sp == 0)
 
                 if course_prof['calculate_loss'] and opts['encoder_opts']['side_info']:
                     split_ts_cp = 1. * (data.tables['course_prof'].split == 2)
                 else:
                     split_ts_cp = np.zeros_like(data.tables['course_prof'].split == 2)
-                vals_ts_cp = data.tables['course_prof'].values_all * (split_ts_cp == 0)
+                # vals_ts_cp = data.tables['course_prof'].values_all * (split_ts_cp == 0)
 
                 ts_dict = {student_course['indices']:data.tables['student_course'].indices_all,
+                           student_course['indices_noisy']:data.tables['student_course'].indices_tr_vl,
                            student_course['values']:data.tables['student_course'].values_all,  # values used when calculating loss
+                           student_course['values_noisy']:data.tables['student_course'].values_tr_vl,  # values used for making predictions
                            student_course['noise_mask']:split_ts_sc,
-                           student_course['values_noisy']:vals_ts_sc,  # values used for making predictions
+
                            student_prof['indices']:data.tables['student_prof'].indices_all,
+                           student_prof['indices_noisy']:data.tables['student_prof'].indices_tr_vl,
                            student_prof['values']:data.tables['student_prof'].values_all,
+                           student_prof['values_noisy']:data.tables['student_prof'].values_tr_vl,
                            student_prof['noise_mask']:split_ts_sp,
-                           student_prof['values_noisy']:vals_ts_sp,
+
                            course_prof['indices']:data.tables['course_prof'].indices_all,
+                           course_prof['indices_noisy']:data.tables['course_prof'].indices_tr_vl,
                            course_prof['values']:data.tables['course_prof'].values_all,
+                           course_prof['values_noisy']:data.tables['course_prof'].values_tr_vl,
                            course_prof['noise_mask']:split_ts_cp,
-                           course_prof['values_noisy']:vals_ts_cp,
                            }
 
                 loss_ts, student_embeds_out_ts, course_embeds_out_ts, prof_embeds_out_ts = sess.run([rec_loss_vl,
-                                                                                                              encoder_out_vl['student_course']['row_embeds'],
-                                                                                                              encoder_out_vl['student_course']['col_embeds'],
-                                                                                                              encoder_out_vl['student_prof']['col_embeds']], feed_dict=ts_dict)
+                                                                                                     encoder_out_vl['student_course']['row_embeds'],
+                                                                                                     encoder_out_vl['student_course']['col_embeds'],
+                                                                                                     encoder_out_vl['student_prof']['col_embeds']], feed_dict=ts_dict)
             else:
                 loss_ts = 0
 

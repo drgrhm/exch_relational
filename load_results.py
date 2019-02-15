@@ -9,9 +9,9 @@ if __name__ == "__main__":
     np.set_printoptions(suppress=True, linewidth=np.nan, threshold=np.nan)
 
     # experiment = 'embedding'
-    experiment = 'sparsity'
+    # experiment = 'sparsity'
     # experiment = 'side_info'
-    # experiment = 'sparsity_varied'
+    experiment = 'sparsity_varied'
 
     ## Embeddings experiment
     if experiment == 'embedding':
@@ -75,7 +75,7 @@ if __name__ == "__main__":
         image_path = 'img/sparsity_experiment/'
 
         percent_observed = [.9, .8, .7, .6, .5, .4, .3, .2, .1]
-        num_runs = 2
+        num_runs = 5
 
         loss_ts = np.zeros((num_runs, len(percent_observed)))
         loss_mean = np.zeros((num_runs, len(percent_observed)))
@@ -153,7 +153,7 @@ if __name__ == "__main__":
         # percent_observed = [.5, .1, .0]
         percent_observed = [.5, .3, .1, .0]
 
-        num_runs = 2
+        num_runs = 5
         loss_ts = np.zeros((num_runs, len(percent_observed)))
         loss_mean = np.zeros((num_runs, len(percent_observed)))
 
@@ -233,16 +233,15 @@ if __name__ == "__main__":
         image_path = 'img/sparsity_varied_experiment/'
 
         percent_observed = [.9, .8, .7, .6, .5, .4, .3, .2, .1]
-        num_runs = 1
+        num_runs = 5
 
         # loss_ts = np.zeros((num_runs, len(percent_observed), len(percent_observed)))
         # loss_mean = np.zeros((num_runs, len(percent_observed), len(percent_observed)))
-
         loss_ts_ave = np.zeros((len(percent_observed), len(percent_observed)))
         loss_mean_ave = np.zeros((len(percent_observed), len(percent_observed)))
 
         # for k in range(num_runs):
-        for k in [0]:
+        for k in [0, 1, 2, 3, 4]:
             loss_file = open(checkpoint_path + 'run_{:d}_loss_varied.npz'.format(k), 'rb')
             loss_data = np.load(loss_file)
             loss_ts = loss_data['loss_ts']
@@ -251,13 +250,19 @@ if __name__ == "__main__":
             loss_ts_ave += loss_ts
             loss_mean_ave += loss_mean
 
+            plt.imshow(loss_ts, cmap='plasma', interpolation='nearest')
+            plt.savefig(image_path + 'loss_{:d}.pdf'.format(k), bbox_inches='tight')
+            plt.clf()
+
         loss_ts_ave /= num_runs
         loss_mean_ave /= num_runs
 
+        plt.imshow(loss_ts_ave, interpolation='nearest')
+        plt.savefig(image_path + 'loss_ave.pdf', bbox_inches='tight')
+        plt.clf()
 
-
-            # plt.imshow(loss_mean - loss_ts, cmap='hot', interpolation='nearest')
-            # plt.savefig(image_path + 'mean_loss.pdf', bbox_inches='tight')
-            # plt.clf()
+        plt.imshow((loss_mean_ave - loss_ts_ave) / loss_mean_ave, cmap='plasma', interpolation='nearest')
+        plt.savefig(image_path + 'loss_normalized.pdf', bbox_inches='tight')
+        plt.clf()
 
 

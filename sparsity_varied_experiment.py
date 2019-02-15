@@ -109,9 +109,9 @@ if __name__ == "__main__":
 
     checkpoints_folder = opts['checkpoints_folder']
 
-    n_runs = 3
-    loss_ts = np.zeros((n_runs, 9, 9))
-    loss_mean = np.zeros((n_runs, 9, 9))
+    n_runs = 10
+    loss_ts = np.zeros((n_runs, 10, 10))
+    loss_mean = np.zeros((n_runs, 10, 10))
 
     #########
     transductive = True
@@ -122,15 +122,14 @@ if __name__ == "__main__":
     else:
         np.random.seed(9858776)
 
-    # observed_new = []
     for k in range(n_runs): # repeat experiment n_runs times and average
-    # for k in [1]:
         print('######################## Run ', k, '########################')
 
         if transductive:
             np.random.seed(seeds[k])
 
-        percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1]  # Must be decreasing
+        percent_observed = np.logspace(0, -1.6, num=11, endpoint=True)  # Must be decreasing. log_10(-1.6) corresponds to 2.5% sparsity level, which ensures at least 3 entries per row and column. Include 1. just for constructing observed masks
+        # percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1]  # Must be decreasing
 
         embeddings = {}
         embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
@@ -142,6 +141,7 @@ if __name__ == "__main__":
         observed[0]['sp'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][2]))
         observed[0]['cp'] = np.ones((opts['toy_data']['size'][1], opts['toy_data']['size'][2]))
 
+        # The original observations, on which the models are trained
         for i in range(1, len(percent_observed)): # data matrices are percent_observed[i]% observed
 
             p_prev = percent_observed[i-1]
@@ -157,71 +157,67 @@ if __name__ == "__main__":
         percent_observed = percent_observed[1:] # remove 1.0 from list, since some data must be unobserved to make predictions
         observed = observed[1:] # remove corresponding matrix
 
+
+        # Which of the non-test data (i.e. entries not being predicted) to use for making predictions
+        observed_new = [{}]
+        observed_new[0]['sc'] = np.copy(observed[0]['sc'])  # start from the 90% observed data
+        observed_new[0]['sp'] = np.copy(observed[0]['sp'])
+        observed_new[0]['cp'] = np.copy(observed[0]['cp'])
+
+        # Make the predictions
+        for i in range(1, len(percent_observed)):  # data matrices are percent_observed[i]% observed
+
+            p_prev = percent_observed[i - 1]
+            po = percent_observed[i]
+
+            p_keep = po / p_prev
+
+            observed_new.append({})
+            observed_new[i]['sc'] = update_observed(observed_new[i - 1]['sc'], p_keep, opts['toy_data']['min_observed'])
+            observed_new[i]['sp'] = update_observed(observed_new[i - 1]['sp'], p_keep, opts['toy_data']['min_observed'])
+            observed_new[i]['cp'] = update_observed(observed_new[i - 1]['cp'], p_keep, opts['toy_data']['min_observed'])
+
+        predict = {}
+        predict['sc'] = np.ones_like(observed[0]['sc']) - observed[0]['sc']
+        predict['sp'] = np.ones_like(observed[0]['sp']) - observed[0]['sp']
+        predict['cp'] = np.ones_like(observed[0]['cp']) - observed[0]['cp']
+
         for i, p in enumerate(percent_observed): # training sparsity level
+            print("===== Model building loop {:d} ({:4f} fraction) =====".format(i, p))
 
-                print('========== Observed loop ', i, '==========')
+            opts['split_sizes'] = [.8, .2, 0]
+            opts['checkpoints_folder'] = checkpoints_folder + '/sparsity_varied_experiment/' + str(k) + '/' + str(i)
 
-                count_sc = observed[i]['sc'].shape[0] * observed[i]['sc'].shape[1]
-                count_sp = observed[i]['sp'].shape[0] * observed[i]['sp'].shape[1]
-                count_cp = observed[i]['cp'].shape[0] * observed[i]['cp'].shape[1]
+            for j, q in enumerate(percent_observed): # prediction sparsity level
+                print("===== Prediction loop {:d} ({:4f} fraction) =====".format(j, q))
 
-                opts['split_sizes'] = [.8, .2, 0]
-                opts['checkpoints_folder'] = checkpoints_folder + '/sparsity_varied_experiment/' + str(k) + '/' + str(i)
+                opts['toy_data']['sparsity'] = q
 
-                for j, q in enumerate(percent_observed):
+                opts['data'] = ToyDataLoader(opts['toy_data']['size'],
+                                             opts['toy_data']['sparsity'],
+                                             opts['split_sizes'],
+                                             opts['encoder_opts']['units_in'],
+                                             opts['toy_data']['embedding_size'],
+                                             opts['toy_data']['min_observed'],
+                                             embeddings=embeddings,
+                                             observed=observed_new[j],
+                                             predict_unobserved=False,
+                                             predict=predict
+                                             )
+                opts['auto_restore'] = True
+                restore_point = opts['checkpoints_folder'] + '/best.ckpt'
+                opts['evaluate_only'] = True
+                opts['save_model'] = False
 
-                    if j < i:
-
-                        print('===== Predict loop ', j, '=====') # prediction sparsity level
-
-                        # observed_new[i]['sc'] = update_observed(observed[i]['sc'], q / p, opts['toy_data']['min_observed'])
-                        # observed_new[i]['sp'] = update_observed(observed[i]['sp'], q / p, opts['toy_data']['min_observed'])
-                        # observed_new[i]['cp'] = update_observed(observed[i]['cp'], q / p, opts['toy_data']['min_observed'])
-
-                        observed_new = {}
-                        predict = {}
-                        observed_new['sc'] = np.zeros_like(observed[-1]['sc'])
-                        observed_new['sc'][np.nonzero(observed[-1]['sc'])] = 1
-                        observed_new['sc'][np.nonzero(observed[j]['sc'])] = 1
-
-                        observed_new['sp'] = np.zeros_like(observed[-1]['sp'])
-                        observed_new['sp'][np.nonzero(observed[-1]['sp'])] = 1
-                        observed_new['sp'][np.nonzero(observed[j]['sp'])] = 1
-
-                        observed_new['cp'] = np.zeros_like(observed[-1]['cp'])
-                        observed_new['cp'][np.nonzero(observed[-1]['cp'])] = 1
-                        observed_new['cp'][np.nonzero(observed[j]['cp'])] = 1
-
-                        predict['sc'] = observed[-1]['sc']
-                        predict['sp'] = observed[-1]['sp']
-                        predict['cp'] = observed[-1]['cp']
-
-                        opts['toy_data']['sparsity'] = q
-
-                        opts['data'] = ToyDataLoader(opts['toy_data']['size'],
-                                                     opts['toy_data']['sparsity'],
-                                                     opts['split_sizes'],
-                                                     opts['encoder_opts']['units_in'],
-                                                     opts['toy_data']['embedding_size'],
-                                                     opts['toy_data']['min_observed'],
-                                                     embeddings=embeddings,
-                                                     observed=observed_new,
-                                                     predict_unobserved=False,
-                                                     predict=predict)
-                        opts['auto_restore'] = True
-                        restore_point = opts['checkpoints_folder'] + '/best.ckpt'
-                        opts['evaluate_only'] = True
-                        opts['save_model'] = False
-
-                        loss_ts[k, i, j], loss_mean[k, i, j], _, _, _ = main(opts, restore_point)
+                loss_ts[k, i, j], loss_mean[k, i, j], _, _, _ = main(opts, restore_point)
 
         print(loss_ts[k,:,:])
         print(loss_mean[k, :, :])
 
         if transductive:
-            file_name = 'run_{:d}_loss_varied_trans.npz'.format(k)
-        else:
             file_name = 'run_{:d}_loss_varied.npz'.format(k)
+        else:
+            file_name = 'run_{:d}_loss_varied_inductive.npz'.format(k)
 
         path = os.path.join(checkpoints_folder, 'sparsity_varied_experiment', file_name)
         file = open(path, 'wb')

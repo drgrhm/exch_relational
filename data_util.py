@@ -197,11 +197,9 @@ class ToyDataLoader:
             in_vals = observed + predict
             inds = np.array(np.nonzero(in_vals)).T
             vals = tab.flatten()[in_vals.flatten() > 0]
-            # in_vals = in_vals[in_vals != 0]
             split = np.zeros_like(in_vals.flatten())
             split[predict.flatten() == 1] = 1
             split = split[in_vals.flatten() != 0]
-
         else:
             inds = np.array(np.nonzero(observed)).T
             vals = tab.flatten()[observed.flatten() == 1]

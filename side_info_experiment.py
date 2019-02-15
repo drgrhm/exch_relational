@@ -24,7 +24,7 @@ if __name__ == "__main__":
     auto_restore = False
     # save_model = False
 
-    opts = {'epochs':10000,
+    opts = {'epochs':5000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1], # train, validation, test split
@@ -123,7 +123,8 @@ if __name__ == "__main__":
         embeddings['course'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
         embeddings['prof'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
 
-        percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing
+        percent_observed = np.logspace(0, -1.6, num=11, endpoint=True)  # Must be decreasing. log_10(-1.6) corresponds to 2.5% sparsity level, which ensures at least 3 entries per row and column. Include 1. just for constructing observed masks
+        # percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing
         # percent_observed = [1., .5, .3, .1, .0]  # Must be decreasing
 
         observed_sc = choose_observed(0, opts['toy_data']['size'][0:2], opts['toy_data']['sparsity'], min_observed=opts['toy_data']['min_observed'])
@@ -145,7 +146,6 @@ if __name__ == "__main__":
             observed[i]['sp'] = update_observed(observed[i - 1]['sp'], p_keep, min_observed=0)
             observed[i]['cp'] = update_observed(observed[i - 1]['cp'], p_keep, min_observed=0)
 
-
         percent_observed = percent_observed[1:]  # remove 1.0 from list, since some data must be unobserved to make predictions
         observed = observed[1:]  # remove corresponding matrix
 
@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
         for i in range(len(percent_observed)):
 
-            print('===== Model ', i, '=====')
+            print("===== Model building loop {:d} ({:4f} fraction) =====".format(i, p))
 
             opts['data'] = ToyDataLoader(opts['toy_data']['size'],
                                          opts['toy_data']['sparsity'],
@@ -183,5 +183,5 @@ if __name__ == "__main__":
         np.savez(file, losses_ts=losses_ts, losses_mean=losses_mean)
         file.close()
 
-        print("Test loss:\n", losses_ts)
-        print("Predict mean loss:\n", losses_mean)
+        # print("Test loss:\n", losses_ts)
+        # print("Predict mean loss:\n", losses_mean)
