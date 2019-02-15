@@ -99,7 +99,7 @@ if __name__ == "__main__":
             'restore_point_epoch':-1,
             # 'save_model':save_model,
             'save_frequency':1000000, # Save model every save_frequency epochs
-            'loss_save_improvement':.005, # If loss changes by more than loss_save_improvement since last save (as fraction of old value), save the model
+            'loss_save_improvement':.02, # If loss changes by more than loss_save_improvement since last save (as fraction of old value), save the model
             'debug':True, # Set random seeds or not
             'seed':9858776,
             # 'seed': 9870112,
