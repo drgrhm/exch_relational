@@ -111,7 +111,7 @@ if __name__ == "__main__":
     checkpoints_folder = opts['checkpoints_folder']
     os.mkdir(checkpoints_folder + '/side_info_experiment')
 
-    n_runs = 5
+    n_runs = 10
     for k in range(n_runs):
 
         print('######################## Run ', k, '########################')
@@ -123,8 +123,8 @@ if __name__ == "__main__":
         embeddings['course'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
         embeddings['prof'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
 
-        # percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing
-        percent_observed = [1., .5, .3, .1, .0]  # Must be decreasing
+        percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing
+        # percent_observed = [1., .5, .3, .1, .0]  # Must be decreasing
 
         observed_sc = choose_observed(0, opts['toy_data']['size'][0:2], opts['toy_data']['sparsity'], min_observed=opts['toy_data']['min_observed'])
 
