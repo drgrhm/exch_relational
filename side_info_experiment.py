@@ -24,7 +24,7 @@ if __name__ == "__main__":
     auto_restore = False
     # save_model = False
 
-    opts = {'epochs':5000,
+    opts = {'epochs':8000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1], # train, validation, test split
@@ -169,6 +169,7 @@ if __name__ == "__main__":
             opts['checkpoints_folder'] = checkpoints_folder + '/side_info_experiment/' + str(k) + '/'+ str(i)
             os.mkdir(opts['checkpoints_folder'])
             opts['save_model'] = True
+            opts['debug'] = False
 
             if percent_observed[i] == 0.:
                 opts['encoder_opts']['side_info'] = False
