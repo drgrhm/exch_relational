@@ -12,7 +12,7 @@ if __name__ == "__main__":
     data_set = 'toy'
     units_in = 1
     embedding_size_data = 2
-    embedding_size_network = 10
+    embedding_size_network = 4
     units = 64
     units_out = 1
 
@@ -36,7 +36,7 @@ if __name__ == "__main__":
                 'toy_data':{'size':[200, 200, 200],
                             # 'sparsity':1.,
                             'embedding_size':embedding_size_data,
-                            'min_observed':5, # generate at least min_observed entries per row and column (sparsity rate may be affected)
+                            'min_observed':3, # generate at least min_observed entries per row and column (sparsity rate may be affected)
                 },
                 'encoder_opts':{'pool_mode':'mean',
                               'dropout_rate':dropout_rate,
@@ -105,19 +105,21 @@ if __name__ == "__main__":
                 'seed': 9870112,
                 }
 
-    np.random.seed(9873866)
+    # np.random.seed(9873866)
     # np.random.seed(9999999)
+    np.random.seed(8888888)
+
 
     checkpoints_folder = opts['checkpoints_folder']
     os.mkdir(checkpoints_folder + '/sparsity_experiment')
 
-    n_runs = 10
+    n_runs = 5
     for k in range(n_runs):
 
         print('######################## Run ', k, '########################')
-
-        percent_observed = np.logspace(0, -1.6, num=11, endpoint=True) # log_10(-1.6) corresponds to 2.5% sparsity level, which ensures at least 3 entries per row and column. Include 1. just for constructing observed masks
-        # percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1] # Must be decreasing, include 1. just for constructing observed masks
+        # percent_observed = [1, .02]
+        # percent_observed = np.logspace(0, -1.6, num=11, endpoint=True) # log_10(-1.6) corresponds to 2.5% sparsity level, which ensures at least 3 entries per row and column. Include 1. just for constructing observed masks
+        percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1] # Must be decreasing, include 1. just for constructing observed masks
 
         embeddings = {}
         embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
