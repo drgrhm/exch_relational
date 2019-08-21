@@ -69,7 +69,7 @@ class Layer:
                 if keep_dims:
                     out = tf.expand_dims(out, axis=0)
         elif axis == 1:
-            inds = table['indices'][:,0]            
+            inds = table['indices'][:,0]
             num_segments = table['shape'][0]
             if pool_mode == 'mean':
                 count = self.count_entries(table, axis, keep_dims=keep_dims) + eps

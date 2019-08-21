@@ -24,10 +24,10 @@ if __name__ == "__main__":
     auto_restore = False
     # save_model = False
 
-    opts = {'epochs':8000,
+    opts = {'epochs':10000,
             'data_folder':'data',
             'data_set':data_set,
-            'split_sizes':[.8, .1, .1], # train, validation, test split
+            'split_sizes':[.8, .2, 0], # train, validation, test split
             'noise_rate':dropout_rate,
             'regularization_rate':.00001,
             'learning_rate':.0001,
@@ -36,7 +36,7 @@ if __name__ == "__main__":
             'toy_data':{'size':[200, 200, 200],
                         'sparsity':.1,
                         'embedding_size':embedding_size_data,
-                        'min_observed':5, # generate at least 2 entries per row and column (sparsity rate may be affected)
+                        'min_observed':3, # generate at least min_observed entries per row and column (sparsity rate may be affected)
             },
             'encoder_opts':{'pool_mode':'mean',
                           'dropout_rate':dropout_rate,
@@ -105,7 +105,7 @@ if __name__ == "__main__":
             # 'seed': 9870112,
             }
 
-    np.random.seed(9840112)
+    np.random.seed(9858776)
 
 
     checkpoints_folder = opts['checkpoints_folder']
@@ -123,8 +123,8 @@ if __name__ == "__main__":
         embeddings['course'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
         embeddings['prof'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
 
-        percent_observed = np.logspace(0, -1.6, num=11, endpoint=True)  # Must be decreasing. log_10(-1.6) corresponds to 2.5% sparsity level, which ensures at least 3 entries per row and column. Include 1. just for constructing observed masks
-        # percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing
+        # percent_observed = np.logspace(0, -1.6, num=11, endpoint=True)  # Must be decreasing. log_10(-1.6) corresponds to 2.5% sparsity level, which ensures at least 3 entries per row and column. Include 1. just for constructing observed masks
+        percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing
         # percent_observed = [1., .5, .3, .1, .0]  # Must be decreasing
 
         observed_sc = choose_observed(0, opts['toy_data']['size'][0:2], opts['toy_data']['sparsity'], min_observed=opts['toy_data']['min_observed'])
@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
         for i in range(len(percent_observed)):
 
-            print("===== Model building loop {:d} ({:4f} fraction) =====".format(i, p))
+            print("===== Model building loop {:d} =====".format(i))
 
             opts['data'] = ToyDataLoader(opts['toy_data']['size'],
                                          opts['toy_data']['sparsity'],
@@ -169,20 +169,55 @@ if __name__ == "__main__":
             opts['checkpoints_folder'] = checkpoints_folder + '/side_info_experiment/' + str(k) + '/'+ str(i)
             os.mkdir(opts['checkpoints_folder'])
             opts['save_model'] = True
-            opts['debug'] = False
 
             if percent_observed[i] == 0.:
                 opts['encoder_opts']['side_info'] = False
                 opts['decoder_opts']['side_info'] = False
 
             loss_ts, loss_mean, _, _, _ = main(opts)
-            losses_ts.append(loss_ts)
-            losses_mean.append(loss_mean)
+            # loss_ts, loss_mean = 0, 0
 
-        path = os.path.join(checkpoints_folder, 'side_info_experiment', str(k), 'loss.npz')
-        file = open(path, 'wb')
-        np.savez(file, losses_ts=losses_ts, losses_mean=losses_mean)
-        file.close()
+
+        #     losses_ts.append(loss_ts)
+        #     losses_mean.append(loss_mean)
+        #
+        # path = os.path.join(checkpoints_folder, 'side_info_experiment', str(k), 'loss.npz')
+        # file = open(path, 'wb')
+        # np.savez(file, losses_ts=losses_ts, losses_mean=losses_mean)
+        # file.close()
+
+
+
+            for j, q in enumerate(percent_observed):  # prediction sparsity level
+                print("===== Prediction loop {:d} ({:4f} fraction) =====".format(j, q))
+
+                opts['data'] = ToyDataLoader(opts['toy_data']['size'],
+                                             opts['toy_data']['sparsity'],
+                                             opts['split_sizes'],
+                                             opts['encoder_opts']['units_in'],
+                                             opts['toy_data']['embedding_size'],
+                                             opts['toy_data']['min_observed'],
+                                             embeddings=embeddings,
+                                             observed=observed_new[j],
+                                             predict_unobserved=False,
+                                             predict=predict
+                                             )
+            #     opts['auto_restore'] = True
+            #     restore_point = opts['checkpoints_folder'] + '/best.ckpt'
+            #     opts['evaluate_only'] = True
+            #     opts['save_model'] = False
+            #
+            #     if percent_observed[i] == 0.:
+            #         opts['encoder_opts']['side_info'] = False
+            #         opts['decoder_opts']['side_info'] = False
+            #
+            #     loss_ts[k, i, j], loss_mean[k, i, j], _, _, _ = main(opts, restore_point)
+
+
+
+
+
+
 
         # print("Test loss:\n", losses_ts)
         # print("Predict mean loss:\n", losses_mean)

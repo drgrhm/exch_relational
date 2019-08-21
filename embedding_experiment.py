@@ -23,7 +23,7 @@ if __name__ == "__main__":
     auto_restore = False
     save_model = True
 
-    opts = {'epochs':5000,
+    opts = {'epochs':10001,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1],  # train, validation, test split
@@ -97,14 +97,14 @@ if __name__ == "__main__":
             'image_save_folder':'img',
             'restore_point_epoch':-1,
             'save_model':save_model,
-            'save_frequency':1000,  # Save model every save_frequency epochs
+            'save_frequency':100,  # Save model every save_frequency epochs
             'loss_save_improvement':.05,  # If loss changes by more than loss_save_improvement (as fraction of old value), save the model
             # 'debug':True,  # Set random seeds or not
             # 'seed':9858776,
             # 'seed': 9870112,
             }
 
-    np.random.seed(9988777)
+    np.random.seed(9858776)
     seeds = np.random.randint(low=0, high=1000000, size=1)
     os.mkdir('checkpoints/embedding_experiment/')
 

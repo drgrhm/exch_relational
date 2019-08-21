@@ -32,6 +32,10 @@ def main(opts, restore_point=None):
                              opts['toy_data']['embedding_size'],
                              opts['toy_data']['min_observed'])
 
+    # data_path = os.path.join(opts['checkpoints_folder'], 'data.npz')
+    # data_file = open(data_path, 'wb')
+    # np.savez(data_file, data=data)
+
     loss_mean = 0
     if opts['split_sizes'] is None or opts['split_sizes'][2] == 0:
         if opts['calculate_loss'][0]:
@@ -248,7 +252,6 @@ def main(opts, restore_point=None):
             else:
                 split_eval_cp = np.zeros_like(data.tables['course_prof'].split == 1)
             # vals_eval_cp = data.tables['course_prof'].values_all * (split_eval_cp == 0)
-
 
             eval_dict = {student_course['indices']:data.tables['student_course'].indices_all,
                          student_course['indices_noisy']:data.tables['student_course'].indices_all,
@@ -610,7 +613,7 @@ if __name__ == "__main__":
             'restore_point_epoch':-1,
             'save_model':save_model,
             'save_frequency':5000000, # Save model every save_frequency epochs
-            'loss_save_improvement':.005, # If loss changes by more than loss_save_tolerance (as % of old value), save the model
+            'loss_save_improvement':.01, # If loss changes by more than loss_save_tolerance (as % of old value), save the model
             'debug':True, # Set random seeds or not
             'seed':9858776,
             # 'seed': 9870112,

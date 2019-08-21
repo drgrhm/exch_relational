@@ -128,7 +128,6 @@ class ToyDataLoader:
             self._predict = {'sc':None, 'sp':None, 'cp':None}
         self._predict_unobserved = predict_unobserved
 
-
         assert embedding_size == 2, 'Currently only embedding size of 2 is supported'
 
         self._sparsity = sparsity

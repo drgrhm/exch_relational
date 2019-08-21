@@ -5,14 +5,14 @@ from layers import ExchangeableLayer, FeatureDropoutLayer, PoolingLayer, BatchNo
 from data_util import ToyDataLoader
 from util import gaussian_embeddings, np_rmse_loss, update_observed
 import tensorflow as tf
-
+import pickle
 
 if __name__ == "__main__":
 
     data_set = 'toy'
     units_in = 1
     embedding_size_data = 2
-    embedding_size_network = 4
+    embedding_size_network = 10
     units = 64
     units_out = 1
 
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     auto_restore = False
     # save_model = False
 
-    opts = {'epochs':5000,
+    opts = {'epochs':4000,
                 'data_folder':'data',
                 'data_set':data_set,
                 # 'split_sizes':[.8, .2, .0], # train, validation, test split
@@ -36,7 +36,7 @@ if __name__ == "__main__":
                 'toy_data':{'size':[200, 200, 200],
                             # 'sparsity':1.,
                             'embedding_size':embedding_size_data,
-                            'min_observed':3, # generate at least min_observed entries per row and column (sparsity rate may be affected)
+                            'min_observed':5, # generate at least min_observed entries per row and column (sparsity rate may be affected)
                 },
                 'encoder_opts':{'pool_mode':'mean',
                               'dropout_rate':dropout_rate,
@@ -107,8 +107,10 @@ if __name__ == "__main__":
 
     # np.random.seed(9873866)
     # np.random.seed(9999999)
-    np.random.seed(8888888)
-
+    # np.random.seed(8888888)
+    # np.random.seed(7777777)
+    # np.random.seed(6666666)
+    np.random.seed(33)
 
     checkpoints_folder = opts['checkpoints_folder']
     os.mkdir(checkpoints_folder + '/sparsity_experiment')
@@ -125,9 +127,6 @@ if __name__ == "__main__":
         embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
         embeddings['course'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
         embeddings['prof'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
-
-        num_alpha = max(4, opts['toy_data']['embedding_size'])
-        alpha = {'sc':2 * np.random.randn(num_alpha), 'sp':2 * np.random.randn(num_alpha), 'cp':2 * np.random.randn(num_alpha)}
 
         observed = [{}]
         observed[0]['sc'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][1]))
@@ -152,6 +151,8 @@ if __name__ == "__main__":
         loss_mean = np.zeros(len(percent_observed))
 
         os.mkdir(checkpoints_folder + '/sparsity_experiment/' + str(k))
+
+        pickle.dump({'embeddings':embeddings, 'observed':observed}, open(checkpoints_folder + '/sparsity_experiment/' + str(k) + '/data.p', 'wb'))
 
         for i, p in enumerate(percent_observed):
             print("===== Model building loop {:d} ({:4f} fraction) =====".format(i,p))
