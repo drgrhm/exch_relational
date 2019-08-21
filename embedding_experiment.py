@@ -7,9 +7,9 @@ from layers import ExchangeableLayer, FeatureDropoutLayer, PoolingLayer, BatchNo
 if __name__ == "__main__":
 
     data_set = 'toy'
-    units_in = 1
-    units = 64
-    units_out = 1
+    units_in = 1  # number of input features
+    units = 64  # number of features in network layers
+    units_out = 1  # number of output features
 
     embedding_size_data = 2
     embedding_size_network = 2
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     auto_restore = False
     save_model = True
 
-    opts = {'epochs':10001,
+    opts = {'epochs':5000,
             'data_folder':'data',
             'data_set':data_set,
             'split_sizes':[.8, .1, .1],  # train, validation, test split
@@ -106,7 +106,16 @@ if __name__ == "__main__":
 
     np.random.seed(9858776)
     seeds = np.random.randint(low=0, high=1000000, size=1)
-    os.mkdir('checkpoints/embedding_experiment/')
+
+
+    try:
+        os.mkdir('checkpoints')
+    except FileExistsError:
+        pass
+    try:
+        os.mkdir('checkpoints/embedding_experiment/')
+    except FileExistsError:
+        pass
 
     for seed in seeds:
 
