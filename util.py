@@ -170,20 +170,10 @@ def plot_loss(losses_tr, losses_vl, mean_tr, title, path):
     plt.clf()
 
 
-def gaussian_embeddings(embedding_size, n_embeddings):
-    """Multivariate Gaussian feature embeddings."""
-    # means = np.random.normal(0, 10, embedding_size)
-    # means = np.random.normal(0, 1, embedding_size)
-    # stds = np.random.uniform(1, 10, embedding_size)
-    # embeds = np.random.multivariate_normal(means, np.diag(stds), size=n_embeddings)
+def _uniform_embeddings(embedding_size, n_embeddings, min=-2, max=2):
+    """Uniform feature embeddings in range (min, max)."""
 
-    # means = np.random.normal(0, .1, embedding_size)
-    # embeds = np.random.multivariate_normal([0, 1], [[1, 0], [0, 1]], size=n_embeddings)
-
-    embeds = np.random.uniform(-2, 2, size=embedding_size*n_embeddings).reshape((n_embeddings, embedding_size))
-
-    # print('MEANS', means)
-    # print("EMBEDS", embeds[:5, :])
+    embeds = np.random.uniform(min, max, size=embedding_size*n_embeddings).reshape((n_embeddings, embedding_size))
 
     return embeds
 

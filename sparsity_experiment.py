@@ -3,7 +3,7 @@ import numpy as np
 from main import main
 from layers import ExchangeableLayer, FeatureDropoutLayer, PoolingLayer, BatchNormLayer
 from data_util import ToyDataLoader
-from util import gaussian_embeddings, np_rmse_loss, update_observed
+from util import _uniform_embeddings, np_rmse_loss, update_observed
 import tensorflow as tf
 import pickle
 
@@ -124,9 +124,9 @@ if __name__ == "__main__":
         percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1] # Must be decreasing, include 1. just for constructing observed masks
 
         embeddings = {}
-        embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
-        embeddings['course'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
-        embeddings['prof'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
+        embeddings['student'] = _uniform_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
+        embeddings['course'] = _uniform_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
+        embeddings['prof'] = _uniform_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
 
         observed = [{}]
         observed[0]['sc'] = np.ones((opts['toy_data']['size'][0], opts['toy_data']['size'][1]))

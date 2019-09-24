@@ -3,7 +3,7 @@ import numpy as np
 from main import main
 from layers import ExchangeableLayer, FeatureDropoutLayer, PoolingLayer, BatchNormLayer
 from data_util import ToyDataLoader
-from util import gaussian_embeddings, np_rmse_loss, update_observed, choose_observed
+from util import _uniform_embeddings, np_rmse_loss, update_observed, choose_observed
 import tensorflow as tf
 
 
@@ -119,9 +119,9 @@ if __name__ == "__main__":
         os.mkdir(checkpoints_folder + '/side_info_experiment/' + str(k))
 
         embeddings = {}
-        embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
-        embeddings['course'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
-        embeddings['prof'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
+        embeddings['student'] = _uniform_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
+        embeddings['course'] = _uniform_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
+        embeddings['prof'] = _uniform_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
 
         # percent_observed = np.logspace(0, -1.6, num=11, endpoint=True)  # Must be decreasing. log_10(-1.6) corresponds to 2.5% sparsity level, which ensures at least 3 entries per row and column. Include 1. just for constructing observed masks
         percent_observed = [1., .9, .8, .7, .6, .5, .4, .3, .2, .1, .0]  # Must be decreasing

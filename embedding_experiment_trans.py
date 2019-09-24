@@ -2,7 +2,7 @@ import os
 import numpy as np
 from main import main
 import tensorflow as tf
-from util import plot_embeddings, gaussian_embeddings
+from util import plot_embeddings, _uniform_embeddings
 from data_util import ToyDataLoader
 from layers import ExchangeableLayer, FeatureDropoutLayer, PoolingLayer, BatchNormLayer
 
@@ -125,9 +125,9 @@ if __name__ == "__main__":
         np.random.seed(opts['seed'])
 
         embeddings = {}
-        embeddings['student'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
-        embeddings['course'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
-        embeddings['prof'] = gaussian_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
+        embeddings['student'] = _uniform_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][0])
+        embeddings['course'] = _uniform_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][1])
+        embeddings['prof'] = _uniform_embeddings(opts['toy_data']['embedding_size'], opts['toy_data']['size'][2])
 
 
         opts['data'] = ToyDataLoader(opts['toy_data']['size'],

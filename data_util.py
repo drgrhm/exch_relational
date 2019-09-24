@@ -141,9 +141,9 @@ class ToyDataLoader:
 
     def _make_embeddings(self):
 
-        student_embeds = gaussian_embeddings(embedding_size=self._embedding_size, n_embeddings=self._n_students)
-        course_embeds = gaussian_embeddings(embedding_size=self._embedding_size, n_embeddings=self._n_courses)
-        prof_embeds = gaussian_embeddings(embedding_size=self._embedding_size, n_embeddings=self._n_profs)
+        student_embeds = _uniform_embeddings(embedding_size=self._embedding_size, n_embeddings=self._n_students)
+        course_embeds = _uniform_embeddings(embedding_size=self._embedding_size, n_embeddings=self._n_courses)
+        prof_embeds = _uniform_embeddings(embedding_size=self._embedding_size, n_embeddings=self._n_profs)
 
         return {'student': student_embeds, 'course': course_embeds, 'prof':prof_embeds}
 
